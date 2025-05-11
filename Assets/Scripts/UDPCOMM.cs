@@ -218,7 +218,7 @@ namespace communication
             joint1.transform.localEulerAngles = new Vector3(0, 0, -(float)message.FeedBack.Joints.Joints[0]);
             joint2.transform.localEulerAngles = new Vector3(0, -(float)message.FeedBack.Joints.Joints[1], 0);
             joint3.transform.localEulerAngles = new Vector3(0, -(float)message.FeedBack.Joints.Joints[2], 0);
-            joint4.transform.localEulerAngles = new Vector3(-(float)message.FeedBack.Joints.Joints[3], 0, 0);
+            joint4.transform.localEulerAngles = new Vector3((float)message.FeedBack.Joints.Joints[3], 0, 0);
             joint5.transform.localEulerAngles = new Vector3(0, -(float)message.FeedBack.Joints.Joints[4], 0);
             joint6.transform.localEulerAngles = new Vector3(-(float)message.FeedBack.Joints.Joints[5], 0, 0);
 

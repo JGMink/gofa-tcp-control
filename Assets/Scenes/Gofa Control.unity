@@ -157,7 +157,7 @@ PrefabInstance:
       objectReference: {fileID: 5858565089131374101}
     - target: {fileID: 4706292499028447387, guid: b5ab1172648c1a34a8a0f807ebd9d291, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4706292499028447387, guid: b5ab1172648c1a34a8a0f807ebd9d291, type: 3}
       propertyPath: jointDataSender
