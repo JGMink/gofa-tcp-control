@@ -6,12 +6,13 @@ using System.Linq;
 
 public class JointDataSender : MonoBehaviour
 {
-    [Header("Target Device Network Settings")]
-    public string targetDeviceIpAddress = "10.0.0.199"; // TODO: Change to your target device's IP
-    public int targetDevicePort = 7000;                 // TODO: Choose a port for the target device
+    [Header("Network Settings")]
+    // The targetDeviceIpAddress is now automatically set to the broadcast address.
+    // You only need to set the port.
+    public int targetPort = 7000;            // Port to broadcast on
 
     private UdpClient udpClient;
-    private IPEndPoint targetEndPoint;
+    private IPEndPoint broadcastEndPoint;
 
     private bool isInitialized = false;
 
@@ -25,35 +26,40 @@ public class JointDataSender : MonoBehaviour
         try
         {
             udpClient = new UdpClient();
-            targetEndPoint = new IPEndPoint(IPAddress.Parse(targetDeviceIpAddress), targetDevicePort);
-            Debug.Log($"JointDataSender: Initialized. Ready to send to {targetDeviceIpAddress}:{targetDevicePort}");
+            // Set the UdpClient to allow broadcast. This is crucial.
+            udpClient.EnableBroadcast = true;
+
+            // Use IPAddress.Broadcast for the broadcast address (typically 255.255.255.255)
+            broadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, targetPort);
+
+            Debug.Log($"JointDataBroadcaster: Initialized. Ready to broadcast to port {targetPort}");
             isInitialized = true;
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"JointDataSender: Error initializing UdpClient or IPEndPoint: {e.Message}");
+            Debug.LogError($"JointDataBroadcaster: Error initializing UdpClient or IPEndPoint: {e.Message}");
             isInitialized = false;
         }
     }
 
     /// <summary>
-    /// Sends the joint angles to the configured target device.
+    /// Sends the joint angles to all devices on the network via broadcast.
     /// </summary>
     /// <param name="jointAngles">An array of 6 float values representing the robot's joint angles.</param>
     public void SendJointAngles(float[] jointAngles)
     {
         if (!isInitialized)
         {
-            // Debug.LogWarning("JointDataSender: Not initialized. Attempting to re-initialize.");
-            // InitializeSender(); // Optionally try to re-initialize
+            Debug.LogError("JointDataBroadcaster: Not initialized. Cannot send data.");
+            // Optionally, you could try to re-initialize here if it makes sense for your application
+            // InitializeSender();
             // if (!isInitialized) return;
-            Debug.LogError("JointDataSender: Not initialized. Cannot send data.");
             return;
         }
 
         if (jointAngles == null || jointAngles.Length != 6)
         {
-            Debug.LogWarning("JointDataSender: Invalid joint angles data provided. Expected 6 values.");
+            Debug.LogWarning("JointDataBroadcaster: Invalid joint angles data provided. Expected 6 values.");
             return;
         }
 
@@ -64,18 +70,18 @@ public class JointDataSender : MonoBehaviour
             string dataString = string.Join(",", jointAngles.Select(a => a.ToString("F4")));
             byte[] dataBytes = Encoding.UTF8.GetBytes(dataString);
 
-            // Send the data
-            udpClient.Send(dataBytes, dataBytes.Length, targetEndPoint);
-            // Debug.Log($"JointDataSender: Sent data: {dataString} to {targetEndPoint.Address}:{targetEndPoint.Port}"); // Can be spammy
+            // Send the data to the broadcast endpoint
+            udpClient.Send(dataBytes, dataBytes.Length, broadcastEndPoint);
+            // Debug.Log($"JointDataBroadcaster: Sent data: {dataString} to broadcast port {broadcastEndPoint.Port}"); // Can be spammy
         }
         catch (SocketException e)
         {
-            Debug.LogError($"JointDataSender: SocketException while sending data: {e.Message}");
-            // Consider if re-initialization is needed or if the target is unavailable
+            Debug.LogError($"JointDataBroadcaster: SocketException while sending data: {e.Message}");
+            // Consider if re-initialization is needed or if the network is unavailable
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"JointDataSender: Error sending joint data: {e.Message}");
+            Debug.LogError($"JointDataBroadcaster: Error sending joint data: {e.Message}");
         }
     }
 
@@ -85,20 +91,29 @@ public class JointDataSender : MonoBehaviour
         {
             udpClient.Close();
             udpClient = null;
-            Debug.Log("JointDataSender: UdpClient closed.");
+            Debug.Log("JointDataBroadcaster: UdpClient closed.");
         }
     }
 
     // Optional: If you want to test sending from the Inspector or another script
-    [ContextMenu("Test Send Dummy Data")]
+    [ContextMenu("Test Send Dummy Data (Broadcast)")]
     public void TestSend()
     {
         if (!Application.isPlaying)
         {
-            Debug.LogWarning("JointDataSender: TestSend can only be used in Play Mode.");
+            Debug.LogWarning("JointDataBroadcaster: TestSend can only be used in Play Mode.");
             return;
         }
-        if (!isInitialized) InitializeSender(); // Ensure initialized for test
-        SendJointAngles(new float[] { 10.1f, 20.2f, 30.3f, 40.4f, 50.5f, 60.6f });
+        // Ensure initialized for test. If Start() hasn't run yet, this will initialize.
+        if (!isInitialized)
+        {
+            InitializeSender();
+            if (!isInitialized)
+            {
+                Debug.LogError("JointDataBroadcaster: Failed to initialize for TestSend.");
+                return;
+            }
+        }
+        SendJointAngles(new float[] { 10.1234f, 20.2345f, 30.3456f, 40.4567f, 50.5678f, 60.6789f });
     }
 }
