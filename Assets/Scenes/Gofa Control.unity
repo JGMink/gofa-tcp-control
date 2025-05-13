@@ -260,8 +260,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bc52686fa5544ec2aacd0a60e50266a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  targetDeviceIpAddress: 10.0.0.199
-  targetDevicePort: 7000
+  targetPort: 7000
 --- !u!114 &501212772
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -274,11 +273,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e29ae726fa614464a57c8847a51f3ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverListenPort: 5005
-  clientListenPortForBroadcasts: 5006
+  serverTcpControlPort: 5007
+  serverUdpDataPort: 5005
+  clientListenPortForUdpBroadcasts: 5006
   targetObjectToMove: {fileID: 3797525683882037927}
   controllerStatusText: {fileID: 703183119}
-  lastClientActivityText: {fileID: 1088127675}
+  connectedClientsText: {fileID: 1088127675}
 --- !u!1 &703183117
 GameObject:
   m_ObjectHideFlags: 0

@@ -2,17 +2,15 @@ using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using Newtonsoft.Json; // Make sure Newtonsoft.Json is in your project
+using Newtonsoft.Json;
 using System.Threading;
 using System.Collections.Generic;
-// using System.Numerics; // UnityEngine.Vector3 is used, System.Numerics.Vector3 is not needed unless for other purposes.
+using System.IO; // For StreamReader/Writer
+using System.Linq; // For client list management
 
-// TMP CHANGE: Add TextMeshPro namespace
-using TMPro;
+using TMPro; // Assuming you still want TextMeshPro for server-side display
 
 // --- Message Definitions ---
-// Ideally, these classes would be in a separate shared file (e.g., Messages.cs)
-// Duplicated here for example purposes.
 public class BaseMessage { public string type; }
 
 public class RequestControlMessage : BaseMessage
@@ -47,220 +45,98 @@ public class ControlStatusMessage : BaseMessage
     public ControlStatusMessage() { type = "controlStatus"; } // For deserialization
 }
 // --- End of Message Definitions ---
-
 public class UdpServerController : MonoBehaviour
 {
-    [Header("Network Settings - Server Listener")]
-    public int serverListenPort = 5005; // Port this server listens on for client messages
+    [Header("Network Settings - TCP for Control")]
+    public int serverTcpControlPort = 5007; // Port for TCP control messages
 
-    [Header("Network Settings - Broadcast to Clients")]
-    public int clientListenPortForBroadcasts = 5006; // Port clients are listening on for our broadcasts
+    [Header("Network Settings - UDP for Data")]
+    public int serverUdpDataPort = 5005; // Port this server listens on for client data messages
+
+    [Header("Network Settings - UDP Broadcast to Clients")]
+    public int clientListenPortForUdpBroadcasts = 5006; // Port clients listen on for our status broadcasts
 
     [Header("Control State")]
-    private string _currentControllerIp = null;
-    private readonly object _lockObject = new object(); // For thread safety around _currentControllerIp
+    private string _currentControllerIp = null; // IP of the client with control
+    private TcpClient _currentControllerTcpClient = null; // TCP client instance that has control
+    private readonly object _controlLock = new object();
 
     [Header("Target Object (Optional)")]
-    public GameObject targetObjectToMove; // GameObject to move based on controlled client's data
+    public GameObject targetObjectToMove;
 
-    // TMP CHANGE: Add TextMeshPro UI references
-    [Header("UI Display")]
-    public TextMeshProUGUI controllerStatusText; // Assign in Inspector
-    public TextMeshProUGUI lastClientActivityText; // Assign in Inspector
+    [Header("UI Display (Optional)")]
+    public TextMeshProUGUI controllerStatusText;
+    public TextMeshProUGUI connectedClientsText; // To show TCP connected clients
 
-    private UdpClient _udpListener;
-    private Thread _listenerThread;
-    private volatile bool _isListening = false;
+    private TcpListener _tcpListener;
+    private Thread _tcpListenerThread;
+    private volatile bool _isTcpListening = false;
+    private List<ClientHandler> _connectedTcpClients = new List<ClientHandler>();
+    private readonly object _tcpClientsLock = new object();
+
+    private UdpClient _udpDataListener;
+    private Thread _udpDataListenerThread;
+    private volatile bool _isUdpListening = false;
 
     // For main thread processing of received data
     private volatile bool _newDataToProcess = false;
     private UnityEngine.Vector3 _receivedPosition;
     private UnityEngine.Vector3 _receivedRotation;
 
-    // TMP CHANGE: Variables to store data for UI update on the main thread
-    private volatile string _uiControllerIpUpdate = null;
-    private volatile string _uiLastSenderIpUpdate = null;
+    // For UI updates from other threads
     private volatile bool _uiNeedsUpdate = false;
+    private volatile string _lastActivityLog = "";
 
 
     void Start()
     {
-        // TMP CHANGE: Initial UI Update
-        UpdateUIText();
+        Application.runInBackground = true; // Keep server running even if window loses focus
+        UpdateUIText(); // Initial UI
 
+        // Start TCP Control Listener
         try
         {
-            _udpListener = new UdpClient(serverListenPort);
-            Debug.Log($"UDP Server Controller started. Listening on port {serverListenPort}. Broadcasting control status to port {clientListenPortForBroadcasts}.");
-
-            _listenerThread = new Thread(new ThreadStart(ListenForClientMessages));
-            _listenerThread.IsBackground = true;
-            _isListening = true;
-            _listenerThread.Start();
-        }
-        catch (SocketException e)
-        {
-            Debug.LogError($"SocketException in Start: {e.Message}. Ensure port {serverListenPort} is not in use.");
-            if (controllerStatusText) controllerStatusText.text = $"Error: Port {serverListenPort} in use.";
-            enabled = false; // Disable script if listening can't start
+            _tcpListener = new TcpListener(IPAddress.Any, serverTcpControlPort);
+            _tcpListenerThread = new Thread(new ThreadStart(ListenForTcpConnections));
+            _tcpListenerThread.IsBackground = true;
+            _isTcpListening = true;
+            _tcpListenerThread.Start();
+            Debug.Log($"TCP Control Server started on port {serverTcpControlPort}");
+            LogActivity($"TCP Control Server started on port {serverTcpControlPort}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Error starting UDP listener: {e.Message}");
-            if (controllerStatusText) controllerStatusText.text = "Error starting listener.";
+            Debug.LogError($"Error starting TCP listener: {e.Message}");
+            LogActivity($"Error starting TCP listener: {e.Message}");
             enabled = false;
+            return;
         }
-    }
 
-    private void ListenForClientMessages()
-    {
-        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0); // Receives from any IP/port
-
-        while (_isListening)
-        {
-            try
-            {
-                byte[] receivedBytes = _udpListener.Receive(ref remoteEndPoint); // Blocks
-                string jsonMessage = Encoding.UTF8.GetString(receivedBytes);
-                string senderIp = remoteEndPoint.Address.ToString();
-
-                // TMP CHANGE: Mark for UI update with the last sender
-                _uiLastSenderIpUpdate = senderIp;
-                _uiNeedsUpdate = true;
-
-
-                BaseMessage baseMsg = JsonConvert.DeserializeObject<BaseMessage>(jsonMessage);
-
-                if (baseMsg == null)
-                {
-                    Debug.LogWarning($"Received null message from {senderIp}. Raw: {jsonMessage}");
-                    continue;
-                }
-
-                // Debug.Log($"Received message of type '{baseMsg.type}' from {senderIp}");
-
-                lock (_lockObject) // Ensure thread-safe access to _currentControllerIp
-                {
-                    string previousControllerIp = _currentControllerIp; // Store previous for comparison
-
-                    switch (baseMsg.type)
-                    {
-                        case "requestControl":
-                            Debug.Log($"Control request received from {senderIp}. Current controller: {_currentControllerIp ?? "NONE"}");
-                            if (string.IsNullOrEmpty(_currentControllerIp) || _currentControllerIp == senderIp)
-                            {
-                                if (_currentControllerIp != senderIp)
-                                {
-                                    Debug.Log($"Assigning control to {senderIp}.");
-                                }
-                                else
-                                {
-                                    Debug.Log($"Re-confirming control for {senderIp}.");
-                                }
-                                _currentControllerIp = senderIp;
-                                BroadcastControlStatus(); // This will also trigger UI update via _uiControllerIpUpdate
-                            }
-                            else
-                            {
-                                Debug.Log($"Control request from {senderIp} denied. {_currentControllerIp} already has control. Re-broadcasting current status.");
-                                BroadcastControlStatus(); // Re-broadcast to inform the requester
-                            }
-                            break;
-
-                        case "releaseControl":
-                            Debug.Log($"Release control request received from {senderIp}. Current controller: {_currentControllerIp ?? "NONE"}");
-                            if (_currentControllerIp == senderIp)
-                            {
-                                Debug.Log($"Controller {senderIp} released control.");
-                                _currentControllerIp = null;
-                                BroadcastControlStatus(); // This will also trigger UI update
-                            }
-                            else
-                            {
-                                Debug.LogWarning($"Release request from {senderIp}, but current controller is {_currentControllerIp ?? "NONE"}. Ignoring.");
-                            }
-                            break;
-
-                        case "data":
-                            if (_currentControllerIp == senderIp)
-                            {
-                                DataMessage dataMsg = JsonConvert.DeserializeObject<DataMessage>(jsonMessage);
-                                if (dataMsg != null && dataMsg.payload != null && dataMsg.payload.Length == 6)
-                                {
-                                    _receivedPosition = new UnityEngine.Vector3(dataMsg.payload[0], dataMsg.payload[1], dataMsg.payload[2]);
-                                    _receivedRotation = new UnityEngine.Vector3(dataMsg.payload[3], dataMsg.payload[4], dataMsg.payload[5]);
-                                    _newDataToProcess = true;
-                                }
-                                else
-                                {
-                                    Debug.LogWarning($"Received malformed data message from controller {senderIp}.");
-                                }
-                            }
-                            // No need to log if data is from non-controller, can be noisy
-                            break;
-
-                        default:
-                            Debug.LogWarning($"Received unknown message type '{baseMsg.type}' from {senderIp}.");
-                            break;
-                    }
-
-                    // TMP CHANGE: If controller changed, mark for UI update
-                    if (previousControllerIp != _currentControllerIp)
-                    {
-                        _uiControllerIpUpdate = _currentControllerIp;
-                        _uiNeedsUpdate = true;
-                    }
-                }
-            }
-            catch (SocketException e)
-            {
-                if (_isListening) Debug.LogError($"SocketException in listener thread: {e.Message}");
-            }
-            catch (JsonException e)
-            {
-                Debug.LogError($"JsonException: Could not deserialize message. {e.Message}.");
-            }
-            catch (System.Exception e)
-            {
-                if (_isListening) Debug.LogError($"Error in listener thread: {e.Message}");
-            }
-        }
-        Debug.Log("Server listener thread finished.");
-    }
-
-    private void BroadcastControlStatus()
-    {
-        // This method is called within a lock(_lockObject) block.
-        ControlStatusMessage statusMessage = new ControlStatusMessage(_currentControllerIp);
-        string jsonMessage = JsonConvert.SerializeObject(statusMessage);
-        byte[] data = Encoding.UTF8.GetBytes(jsonMessage);
-
+        // Start UDP Data Listener
         try
         {
-            _udpListener.Send(data, data.Length, new IPEndPoint(IPAddress.Broadcast, clientListenPortForBroadcasts));
-            Debug.Log($"Broadcasted control status: Controller is {_currentControllerIp ?? "NONE"} to port {clientListenPortForBroadcasts}");
-
-            // TMP CHANGE: Set controller IP for UI update on main thread
-            _uiControllerIpUpdate = _currentControllerIp;
-            _uiNeedsUpdate = true;
-        }
-        catch (SocketException e)
-        {
-            Debug.LogError($"SocketException during broadcast: {e.Message}");
+            _udpDataListener = new UdpClient(serverUdpDataPort);
+            _udpDataListenerThread = new Thread(new ThreadStart(ListenForUdpData));
+            _udpDataListenerThread.IsBackground = true;
+            _isUdpListening = true;
+            _udpDataListenerThread.Start();
+            Debug.Log($"UDP Data Listener started on port {serverUdpDataPort}");
+            LogActivity($"UDP Data Listener started on port {serverUdpDataPort}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Error broadcasting control status: {e.Message}");
+            Debug.LogError($"Error starting UDP data listener: {e.Message}");
+            LogActivity($"Error starting UDP data listener: {e.Message}");
+            enabled = false;
         }
     }
 
     void Update()
     {
-        // TMP CHANGE: Process UI updates on the main thread
         if (_uiNeedsUpdate)
         {
             UpdateUIText();
-            _uiNeedsUpdate = false; // Reset flag
+            _uiNeedsUpdate = false;
         }
 
         if (_newDataToProcess)
@@ -270,84 +146,379 @@ public class UdpServerController : MonoBehaviour
                 targetObjectToMove.transform.position = _receivedPosition;
                 targetObjectToMove.transform.eulerAngles = _receivedRotation;
             }
-            _newDataToProcess = false; // Reset flag
+            _newDataToProcess = false;
         }
     }
 
-    // TMP CHANGE: Method to update TextMeshPro UI elements
+    private void LogActivity(string message)
+    {
+        _lastActivityLog = message;
+        _uiNeedsUpdate = true;
+    }
+
+    private void ListenForTcpConnections()
+    {
+        _tcpListener.Start();
+        while (_isTcpListening)
+        {
+            try
+            {
+                TcpClient client = _tcpListener.AcceptTcpClient(); // Blocks
+                ClientHandler clientHandler = new ClientHandler(client, this);
+                lock (_tcpClientsLock)
+                {
+                    _connectedTcpClients.Add(clientHandler);
+                }
+                Thread clientThread = new Thread(new ThreadStart(clientHandler.HandleClientComm));
+                clientThread.IsBackground = true;
+                clientThread.Start();
+                LogActivity($"TCP Client connected: {((IPEndPoint)client.Client.RemoteEndPoint).Address}");
+            }
+            catch (SocketException ex)
+            {
+                if (_isTcpListening) Debug.LogWarning($"SocketException in TCP Listener (expected on close): {ex.Message}");
+                else break; // Exit loop if not listening anymore
+            }
+            catch (System.Exception e)
+            {
+                if (_isTcpListening) Debug.LogError($"Error accepting TCP client: {e.Message}");
+                break; // Exit on other critical errors
+            }
+        }
+        _tcpListener.Stop();
+        Debug.Log("TCP Listener thread finished.");
+    }
+
+    public void RemoveTcpClient(ClientHandler clientHandler)
+    {
+        lock (_tcpClientsLock)
+        {
+            _connectedTcpClients.Remove(clientHandler);
+        }
+        // If the disconnecting client had control, release it
+        lock (_controlLock)
+        {
+            if (_currentControllerTcpClient == clientHandler.TcpClient)
+            {
+                Debug.Log($"Controller {clientHandler.ClientIp} (TCP) disconnected. Releasing control.");
+                LogActivity($"Controller {clientHandler.ClientIp} disconnected. Releasing control.");
+                _currentControllerIp = null;
+                _currentControllerTcpClient = null;
+                BroadcastControlStatus();
+            }
+        }
+        LogActivity($"TCP Client disconnected: {clientHandler.ClientIp}");
+    }
+
+    // This method will be called by ClientHandler instances
+    public void ProcessTcpMessage(BaseMessage message, ClientHandler sender)
+    {
+        lock (_controlLock)
+        {
+            string senderIp = sender.ClientIp;
+            switch (message.type)
+            {
+                case "requestControl":
+                    Debug.Log($"Control request received via TCP from {senderIp}. Current controller: {_currentControllerIp ?? "NONE"}");
+                    LogActivity($"TCP Control Req from {senderIp}. Controller: {_currentControllerIp ?? "NONE"}");
+                    if (string.IsNullOrEmpty(_currentControllerIp) || _currentControllerTcpClient == sender.TcpClient)
+                    {
+                        _currentControllerIp = senderIp;
+                        _currentControllerTcpClient = sender.TcpClient;
+                        Debug.Log($"Assigning/Confirming control (TCP) to {senderIp}.");
+                        LogActivity($"Control granted to {senderIp} (TCP).");
+                        BroadcastControlStatus(); // Inform all clients (UDP)
+                    }
+                    else
+                    {
+                        Debug.Log($"Control request from {senderIp} (TCP) denied. {_currentControllerIp} already has control.");
+                        LogActivity($"Control Req from {senderIp} denied. {_currentControllerIp} in control.");
+                        // Optionally send a "denied" message back via TCP to sender (not implemented here for brevity)
+                        BroadcastControlStatus(); // Re-broadcast current status
+                    }
+                    break;
+
+                case "releaseControl":
+                    Debug.Log($"Release control request via TCP from {senderIp}. Current controller: {_currentControllerIp ?? "NONE"}");
+                    LogActivity($"TCP Release Req from {senderIp}. Controller: {_currentControllerIp ?? "NONE"}");
+                    if (_currentControllerTcpClient == sender.TcpClient)
+                    {
+                        Debug.Log($"Controller {senderIp} (TCP) released control.");
+                        LogActivity($"Control released by {senderIp} (TCP).");
+                        _currentControllerIp = null;
+                        _currentControllerTcpClient = null;
+                        BroadcastControlStatus();
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Release request (TCP) from {senderIp}, but current controller is {_currentControllerIp ?? "NONE"} or different client. Ignoring.");
+                    }
+                    break;
+                default:
+                    Debug.LogWarning($"Received unknown TCP message type '{message.type}' from {senderIp}.");
+                    break;
+            }
+        }
+        _uiNeedsUpdate = true; // For controller status text update
+    }
+
+
+    private void ListenForUdpData()
+    {
+        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+        while (_isUdpListening)
+        {
+            try
+            {
+                byte[] receivedBytes = _udpDataListener.Receive(ref remoteEndPoint); // Blocks
+                string jsonMessage = Encoding.UTF8.GetString(receivedBytes);
+                string senderIp = remoteEndPoint.Address.ToString();
+
+                BaseMessage baseMsg = JsonConvert.DeserializeObject<BaseMessage>(jsonMessage);
+                if (baseMsg == null || baseMsg.type != "data") continue;
+
+                lock (_controlLock) // Check against current controller
+                {
+                    if (_currentControllerIp == senderIp)
+                    {
+                        DataMessage dataMsg = JsonConvert.DeserializeObject<DataMessage>(jsonMessage);
+                        if (dataMsg != null && dataMsg.payload != null && dataMsg.payload.Length == 6)
+                        {
+                            _receivedPosition = new UnityEngine.Vector3(dataMsg.payload[0], dataMsg.payload[1], dataMsg.payload[2]);
+                            _receivedRotation = new UnityEngine.Vector3(dataMsg.payload[3], dataMsg.payload[4], dataMsg.payload[5]);
+                            _newDataToProcess = true;
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"Received malformed UDP data message from controller {senderIp}.");
+                        }
+                    }
+                    // else: Data from non-controller, ignore silently
+                }
+            }
+            catch (SocketException e)
+            {
+                if (_isUdpListening) Debug.LogWarning($"SocketException in UDP Data listener (expected on close): {e.Message}");
+            }
+            catch (JsonException e)
+            {
+                //Debug.LogError($"JsonException in UDP Data listener: {e.Message}. Raw: {Encoding.UTF8.GetString(receivedBytes)}"); // receivedBytes might be out of scope here if error is after new Receive
+            }
+            catch (System.Exception e)
+            {
+                if (_isUdpListening) Debug.LogError($"Error in UDP Data listener: {e.Message}");
+            }
+        }
+        Debug.Log("UDP Data Listener thread finished.");
+    }
+
+    private void BroadcastControlStatus()
+    {
+        // This method might be called from different threads, _currentControllerIp is protected by _controlLock when set
+        string controllerIpForBroadcast;
+        lock(_controlLock) // Ensure reading consistent state
+        {
+            controllerIpForBroadcast = _currentControllerIp;
+        }
+
+        ControlStatusMessage statusMessage = new ControlStatusMessage(controllerIpForBroadcast);
+        string jsonMessage = JsonConvert.SerializeObject(statusMessage);
+        byte[] data = Encoding.UTF8.GetBytes(jsonMessage);
+
+        try
+        {
+            // Use the _udpDataListener to send broadcasts. Ensure it's capable of sending.
+            // Or, create a separate UdpClient for broadcasting if preferred.
+            // For simplicity, re-using _udpDataListener. It needs to be able to send to broadcast address.
+            // This requires the UdpClient not to be "connected" to a single endpoint if it's also used for general sending.
+            // If _udpDataListener was new UdpClient(port), it's fine. If it was new UdpClient() then Connect(), it's an issue for broadcast.
+            // Our _udpDataListener = new UdpClient(serverUdpDataPort) is fine.
+
+            using (UdpClient broadcaster = new UdpClient()) // Temporary client for broadcast to avoid issues with listener
+            {
+                broadcaster.EnableBroadcast = true;
+                IPEndPoint broadcastEp = new IPEndPoint(IPAddress.Broadcast, clientListenPortForUdpBroadcasts);
+                broadcaster.Send(data, data.Length, broadcastEp);
+                Debug.Log($"Broadcasted control status: Controller is {controllerIpForBroadcast ?? "NONE"} to port {clientListenPortForUdpBroadcasts}");
+                LogActivity($"Broadcasted: Controller is {controllerIpForBroadcast ?? "NONE"}");
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Error broadcasting control status: {e.Message}");
+            LogActivity($"Error broadcasting: {e.Message}");
+        }
+        _uiNeedsUpdate = true;
+    }
+
     private void UpdateUIText()
     {
         if (controllerStatusText != null)
         {
-            // Use the main-thread-safe _uiControllerIpUpdate if available, otherwise use the locked _currentControllerIp
-            string controllerDisplay = "Controller: " + (_uiControllerIpUpdate ?? _currentControllerIp ?? "NONE");
-            controllerStatusText.text = controllerDisplay;
+            lock (_controlLock)
+            {
+                controllerStatusText.text = $"Controller: {_currentControllerIp ?? "NONE"}";
+            }
         }
-
-        if (lastClientActivityText != null)
+        if (connectedClientsText != null)
         {
-            // UDP is connectionless, so "connected" is tricky.
-            // We'll show the last client that sent any message.
-            string activityDisplay = "Last Message From: " + (_uiLastSenderIpUpdate ?? "N/A");
-            lastClientActivityText.text = activityDisplay;
+            int count;
+            List<string> ips = new List<string>();
+            lock (_tcpClientsLock)
+            {
+                count = _connectedTcpClients.Count;
+                foreach(var ch in _connectedTcpClients)
+                {
+                    ips.Add(ch.ClientIp);
+                }
+            }
+            connectedClientsText.text = $"TCP Clients ({count}): {string.Join(", ", ips)}\nLast: {_lastActivityLog}";
         }
     }
 
-
-    private void StopListening()
+    private void StopListeners()
     {
-        _isListening = false;
-
-        if (_udpListener != null)
+        _isTcpListening = false;
+        if (_tcpListener != null)
         {
-            _udpListener.Close();
-            _udpListener = null;
-            Debug.Log("UDP Listener closed.");
+            _tcpListener.Stop(); // This should cause AcceptTcpClient to throw an exception
+            _tcpListener = null;
+        }
+        if (_tcpListenerThread != null && _tcpListenerThread.IsAlive)
+        {
+            _tcpListenerThread.Join(500);
         }
 
-        if (_listenerThread != null && _listenerThread.IsAlive)
+        lock (_tcpClientsLock)
         {
-            _listenerThread.Join(500);
-            if (_listenerThread.IsAlive)
+            foreach (var clientHandler in _connectedTcpClients.ToList()) // ToList to avoid modification issues
             {
-                Debug.LogWarning("Listener thread did not terminate gracefully.");
+                clientHandler.Stop();
             }
-            _listenerThread = null;
+            _connectedTcpClients.Clear();
+        }
+
+
+        _isUdpListening = false;
+        if (_udpDataListener != null)
+        {
+            _udpDataListener.Close();
+            _udpDataListener = null;
+        }
+        if (_udpDataListenerThread != null && _udpDataListenerThread.IsAlive)
+        {
+            _udpDataListenerThread.Join(500);
         }
     }
 
     private void OnApplicationQuit()
     {
-        bool hadController;
-        lock (_lockObject)
+        Debug.Log("Server quitting...");
+        LogActivity("Server shutting down...");
+        lock (_controlLock)
         {
-            hadController = !string.IsNullOrEmpty(_currentControllerIp);
-            _currentControllerIp = null;
+            _currentControllerIp = null; // Server is down, no one has control via it
+            _currentControllerTcpClient = null;
         }
-        if (hadController)
-        {
-            Debug.Log("Server quitting. Broadcasting no controller status.");
-            BroadcastControlStatus(); // Will broadcast with _currentControllerIp as null
-        }
-
-        StopListening();
-        Debug.Log("UdpServerController resources cleaned up.");
-
-        // TMP CHANGE: Clear UI on quit
-        _uiControllerIpUpdate = null;
-        _uiLastSenderIpUpdate = "Server shutting down...";
-        UpdateUIText(); // Update one last time
+        BroadcastControlStatus(); // Broadcast one last time that no one has control
+        StopListeners();
+        Debug.Log("HybridCommServer resources cleaned up.");
     }
 
     private void OnDestroy()
     {
-        StopListening();
-        // TMP CHANGE: Optional: Clear UI if destroyed not during quit
-        // if (Application.isPlaying) // Only if destroyed while game is running
-        // {
-        // _uiControllerIpUpdate = null;
-        // _uiLastSenderIpUpdate = "Server stopped.";
-        // UpdateUIText();
-        // }
+        StopListeners(); // Fallback
+    }
+}
+
+// Helper class to handle individual TCP client communication
+public class ClientHandler
+{
+    public TcpClient TcpClient { get; private set; }
+    private UdpServerController _server;
+    private NetworkStream _stream;
+    private StreamReader _reader;
+    private StreamWriter _writer;
+    private volatile bool _isRunning = false;
+    public string ClientIp {get; private set;}
+
+    public ClientHandler(TcpClient client, UdpServerController server)
+    {
+        TcpClient = client;
+        _server = server;
+        _stream = client.GetStream();
+        _reader = new StreamReader(_stream, Encoding.UTF8);
+        _writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true }; // AutoFlush for sending immediately
+        ClientIp = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+    }
+
+    public void HandleClientComm()
+    {
+        _isRunning = true;
+        Debug.Log($"Started handling TCP client: {ClientIp}");
+        try
+        {
+            while (_isRunning && TcpClient.Connected)
+            {
+                string jsonMessage = _reader.ReadLine(); // Blocks until a line is received or connection breaks
+                if (jsonMessage == null) // Client disconnected gracefully
+                {
+                    Debug.Log($"TCP Client {ClientIp} disconnected (ReadLine returned null).");
+                    break;
+                }
+
+                // Debug.Log($"Received TCP from {ClientIp}: {jsonMessage}");
+                try
+                {
+                    BaseMessage baseMsg = JsonConvert.DeserializeObject<BaseMessage>(jsonMessage);
+                    if (baseMsg != null)
+                    {
+                        _server.ProcessTcpMessage(baseMsg, this);
+                    }
+                    else
+                    {
+                         Debug.LogWarning($"Failed to deserialize TCP message from {ClientIp}: {jsonMessage}");
+                    }
+                }
+                catch (JsonException jsonEx)
+                {
+                    Debug.LogError($"JsonException deserializing TCP message from {ClientIp}: {jsonEx.Message}. Raw: {jsonMessage}");
+                }
+            }
+        }
+        catch (IOException ioEx)
+        {
+            // Often happens when client disconnects abruptly or network issue
+            Debug.LogWarning($"IOException for TCP client {ClientIp} (likely disconnect): {ioEx.Message}");
+        }
+        catch (System.Exception e)
+        {
+            // Catch other exceptions to prevent thread from crashing server if possible
+            Debug.LogError($"Error handling TCP client {ClientIp}: {e.Message}\n{e.StackTrace}");
+        }
+        finally
+        {
+            Stop();
+            _server.RemoveTcpClient(this);
+            Debug.Log($"Finished handling TCP client: {ClientIp}");
+        }
+    }
+
+    // Call this to send a message to this specific client (not used in current design, server broadcasts via UDP)
+    // public void SendMessage(BaseMessage message)
+    // {
+    //     if (TcpClient.Connected && _writer != null)
+    //     {
+    //         string json = JsonConvert.SerializeObject(message);
+    //         _writer.WriteLine(json);
+    //     }
+    // }
+
+    public void Stop()
+    {
+        _isRunning = false;
+        if (_reader != null) _reader.Close(); // Close reader/writer before client
+        if (_writer != null) _writer.Close();
+        if (TcpClient != null) TcpClient.Close();
     }
 }
