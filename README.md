@@ -1,4 +1,5 @@
 # Words2Motion 🗣️➡️🏃
+## AI-Based Natural Language to Robot Gestures in Real Time
 
 **Team Members:** Christian Lemma, Joseph Lin, Thomas Marshall, Jonah Minkoff
 
