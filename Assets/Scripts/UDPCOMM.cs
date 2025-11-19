@@ -232,7 +232,7 @@ namespace communication
                 {
                     currentJointAngles[i] = (float)message.FeedBack.Joints.Joints[i];
                 }
-                jointDataSender.SendJointAngles(currentJointAngles);
+                //jointDataSender.SendJointAngles(currentJointAngles);
             }
             else
             {
