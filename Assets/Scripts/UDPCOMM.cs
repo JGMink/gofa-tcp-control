@@ -16,7 +16,7 @@ using System.Threading;
 // using System.Diagnostics; // Removed this line
 
 /*
-* THIS SHIT WAS MADE BY ME .... MILES POPIELA
+* THIS SHIT WAS MADE BY ME .... MILES POPIELA, edited by Jonah Minkoff 12/25
 */
 
 // TODO: Automatic move to home upon initiating connection
@@ -139,29 +139,27 @@ namespace communication
             byte[] bytes = null;
             try
             {
+                // ADD TIMEOUT
+                server.Client.ReceiveTimeout = 1000; // 1 second for initial connection
+                
                 Debug.Log("UpdateValues: Waiting for EGM message from robot...");
-                bytes = server.Receive(ref robotAddress); // This is a blocking call
-                //Debug.Log("Connected (received message for cartesian update)"); // More accurate log
+                bytes = server.Receive(ref robotAddress);
             }
             catch (SocketException e)
             {
-                Debug.LogWarning($"UpdateValues: SocketException: {e.Message}. Robot might not be sending EGM data or network issue.");
-                return; // Exit if error
+                Debug.LogWarning($"UpdateValues: Robot not responding. {e.Message}");
+                return;
             }
             catch (System.Exception e)
             {
                 Debug.LogError($"UpdateValues: General Exception: {e.Message}");
-                return; // Exit if error
+                return;
             }
 
             if (bytes != null && bytes.Length > 0)
             {
                 EgmRobot message = EgmRobot.Parser.ParseFrom(bytes);
                 ParseCurrentPositionFromMessage(message);
-            }
-            else
-            {
-                Debug.Log("UpdateValues: No bytes received.");
             }
         }
 
@@ -177,32 +175,26 @@ namespace communication
             byte[] bytes = null;
             try
             {
-                // Debug.Log("UpdateJointsValues: Waiting for EGM message from robot..."); // Can be spammy
-                bytes = server.Receive(ref robotAddress); // This is a blocking call
-                // Debug.Log("Connected (received message for joint update)"); // More accurate log
+                // ADD TIMEOUT - prevents freezing when robot not connected
+                server.Client.ReceiveTimeout = 100; // 100ms timeout
+                
+                bytes = server.Receive(ref robotAddress);
             }
             catch (SocketException e)
             {
-                // This can happen frequently if EGM session stops or there are network issues.
-                // Log less aggressively or handle state.
-                // Debug.LogWarning($"UpdateJointsValues: SocketException: {e.Message}. Robot might not be sending EGM data or network issue.");
-                return; // Exit if error
+                // Timeout or connection issue - just return, don't spam console
+                return;
             }
             catch (System.Exception e)
             {
                 Debug.LogError($"UpdateJointsValues: General Exception: {e.Message}");
-                return; // Exit if error
+                return;
             }
-
 
             if (bytes != null && bytes.Length > 0)
             {
                 EgmRobot message = EgmRobot.Parser.ParseFrom(bytes);
-                ParseCurrentJointsPositionFromMessage(message); // This will now also send data
-            }
-            else
-            {
-                // Debug.Log("UpdateJointsValues: No bytes received."); // Can be spammy
+                ParseCurrentJointsPositionFromMessage(message);
             }
         }
 
