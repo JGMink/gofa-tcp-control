@@ -11,16 +11,15 @@ public class TCPHotController : MonoBehaviour
     
     private DateTime lastModified;
     private Coroutine activeMove;
+    private string fullPath;
     
     void Start()
     {
-        // Set path relative to project root
-        if (!Path.IsPathRooted(configPath))
-        {
-            configPath = Path.Combine(Application.dataPath, "..", configPath);
-        }
+        // Build path relative to project root
+        string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+        fullPath = Path.Combine(projectRoot, configPath);
         
-        Debug.Log($"Watching: {configPath}");
+        Debug.Log($"Watching: {fullPath}");
         StartCoroutine(WatchFile());
     }
     
@@ -30,9 +29,9 @@ public class TCPHotController : MonoBehaviour
         {
             yield return new WaitForSeconds(pollInterval);
             
-            if (File.Exists(configPath))
+            if (File.Exists(fullPath))
             {
-                DateTime currentModified = File.GetLastWriteTime(configPath);
+                DateTime currentModified = File.GetLastWriteTime(fullPath);
                 
                 if (currentModified != lastModified)
                 {
@@ -47,8 +46,22 @@ public class TCPHotController : MonoBehaviour
     {
         try
         {
-            string json = File.ReadAllText(configPath);
+            string json = File.ReadAllText(fullPath);
+            
+            // Skip empty files
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return;
+            }
+            
             TCPCommand cmd = JsonUtility.FromJson<TCPCommand>(json);
+            
+            // Validate the command
+            if (cmd == null)
+            {
+                Debug.LogWarning("Failed to parse TCP command - file may be incomplete");
+                return;
+            }
             
             // Cancel current movement
             if (activeMove != null)
@@ -62,9 +75,14 @@ public class TCPHotController : MonoBehaviour
             
             Debug.Log($"Moving TCP to: ({cmd.x}, {cmd.y}, {cmd.z})");
         }
-        catch (System.Exception e)
+        catch (IOException)
         {
-            Debug.LogError($"Parse error: {e.Message}");
+            // File is being written to, try again next poll
+            Debug.LogWarning("File is locked, will retry");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Parse error (will retry): {e.Message}");
         }
     }
     
