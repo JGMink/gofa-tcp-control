@@ -1,0 +1,14 @@
+# Core numerical + audio processing
+numpy>=1.23
+sounddevice>=0.4.6
+webrtcvad>=2.0.10
+
+# Azure Speech SDK
+azure-cognitiveservices-speech>=1.37.0
+
+# Azure CLU (Conversational Language Understanding) SDK
+azure-ai-language-conversations>=1.1.0
+azure-core>=1.30.0
+
+# Install dotenv
+python-dotenv>=1.0.1
