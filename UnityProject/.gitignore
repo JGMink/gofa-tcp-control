@@ -63,6 +63,8 @@ sysinfo.txt
 
 # hot-files
 tcp_commands.json
+tcp_commands_detailed.json
+asr_luis_log.jsonl
 
 # Crashlytics generated file
 crashlytics-build.properties

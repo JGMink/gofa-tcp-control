@@ -80,7 +80,7 @@ EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency"]
 EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
 
 # Command queue file
-COMMAND_QUEUE_FILE = "tcp_commands.json"
+COMMAND_QUEUE_FILE = "../UnityProject/tcp_commands.json"
 LOG_FILE = "asr_luis_log.jsonl"
 
 # Global command queue and emergency state
@@ -487,7 +487,7 @@ def mic_capture_thread(stream_writer: MicToAzureStream, stop_event):
     voiced = False
     silence_since = None
 
-    with sd.RawInputStream(
+    with sde.RawInputStream(
         samplerate=SAMPLE_RATE, 
         blocksize=FRAME_SIZE, 
         dtype='int16',
