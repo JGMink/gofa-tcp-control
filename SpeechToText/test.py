@@ -89,7 +89,7 @@ queue_lock = threading.Lock()
 emergency_halt = threading.Event()
 
 # Current TCP position tracking
-current_position = {"x": 0.0, "y": 0.0, "z": 0.0}
+current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
 position_lock = threading.Lock()
 
 
@@ -250,19 +250,48 @@ def add_emergency_halt():
         save_command_queue()
         print(f"🛑 [EMERGENCY HALT ADDED] Total commands: {len(command_queue)}")
 
-
-def save_command_queue():
-    """Save the command queue to JSON file."""
-    # Create two formats: detailed queue and simple position list
-    with open(COMMAND_QUEUE_FILE, 'w') as f:
-        # Just save the positions in simple format for robot execution
-        positions_only = [
-            cmd["position"] for cmd in command_queue 
-            if cmd["command_type"] == "move"
-        ]
-        json.dump(positions_only, f, indent=2)
+# Multiple Command Version: save full command queue to JSON
+# def save_command_queue():
+#     """Save the command queue to JSON file."""
+#     # Create two formats: detailed queue and simple position list
+#     with open(COMMAND_QUEUE_FILE, 'w') as f:
+#         # Just save the positions in simple format for robot execution
+#         positions_only = [
+#             cmd["position"] for cmd in command_queue 
+#             if cmd["command_type"] == "move"
+#         ]
+#         json.dump(positions_only, f, indent=2)
     
-    # Save detailed log separately
+#     # Save detailed log separately
+#     detailed_file = COMMAND_QUEUE_FILE.replace('.json', '_detailed.json')
+#     with open(detailed_file, 'w') as f:
+#         json.dump({
+#             "commands": command_queue,
+#             "total_commands": len(command_queue),
+#             "emergency_halt": emergency_halt.is_set(),
+#             "current_position": current_position
+#         }, f, indent=2)
+
+# Single Command Version: overwrite JSON with only latest command
+def save_command_queue():
+    """Save only the latest command to JSON file (overwrites previous)."""
+    with open(COMMAND_QUEUE_FILE, 'w') as f:
+        if command_queue:
+            # Get the last move command's position
+            latest_move = None
+            for cmd in reversed(command_queue):
+                if cmd["command_type"] == "move":
+                    latest_move = cmd["position"]
+                    break
+            
+            if latest_move:
+                json.dump(latest_move, f, indent=2)
+            else:
+                json.dump({}, f)
+        else:
+            json.dump({}, f)
+    
+    # Keep detailed log separately if you still want history
     detailed_file = COMMAND_QUEUE_FILE.replace('.json', '_detailed.json')
     with open(detailed_file, 'w') as f:
         json.dump({

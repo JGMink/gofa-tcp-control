@@ -38,6 +38,10 @@ except ImportError:
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
 
+# Scale factor: converts centimeters to Unity units
+# Adjust this value until "10 centimeters" moves the right amount
+DISTANCE_SCALE = 0.01  # Start here, tweak as needed
+
 # CLU Configuration
 CLU_ENDPOINT = os.getenv("CLU_ENDPOINT")
 CLU_KEY = os.getenv("CLU_KEY")
@@ -150,6 +154,8 @@ def parse_movement_command(text: str):
         distance = distance / 10.0
     
     delta = {"x": 0.0, "y": 0.0, "z": 0.0}
+
+    distance = distance * DISTANCE_SCALE # Scale to Unity units
     
     # Determine direction - check for "go" or "move" variations
     if "right" in text_lower:
@@ -157,13 +163,13 @@ def parse_movement_command(text: str):
     elif "left" in text_lower:
         delta["x"] = -distance
     elif "up" in text_lower or "upward" in text_lower:
-        delta["z"] = distance
-    elif "down" in text_lower or "downward" in text_lower:
-        delta["z"] = -distance
-    elif "forward" in text_lower or "ahead" in text_lower:
         delta["y"] = distance
-    elif "backward" in text_lower or "back" in text_lower:
+    elif "down" in text_lower or "downward" in text_lower:
         delta["y"] = -distance
+    elif "forward" in text_lower or "ahead" in text_lower:
+        delta["z"] = distance
+    elif "backward" in text_lower or "back" in text_lower:
+        delta["z"] = -distance
     else:
         return None  # Not a recognized movement command
     
