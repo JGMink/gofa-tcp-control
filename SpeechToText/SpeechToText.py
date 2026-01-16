@@ -80,7 +80,7 @@ EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency"]
 EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
 
 # Command queue file
-COMMAND_QUEUE_FILE = "tcp_commands.json"
+COMMAND_QUEUE_FILE = "../UnityProject/tcp_commands.json"
 LOG_FILE = "asr_luis_log.jsonl"
 
 # Global command queue and emergency state

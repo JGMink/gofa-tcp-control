@@ -161,13 +161,13 @@ def parse_movement_command(text: str):
     elif "left" in text_lower:
         delta["x"] = -distance
     elif "up" in text_lower or "upward" in text_lower:
-        delta["z"] = distance
-    elif "down" in text_lower or "downward" in text_lower:
-        delta["z"] = -distance
-    elif "forward" in text_lower or "ahead" in text_lower:
         delta["y"] = distance
-    elif "backward" in text_lower or "back" in text_lower:
+    elif "down" in text_lower or "downward" in text_lower:
         delta["y"] = -distance
+    elif "forward" in text_lower or "ahead" in text_lower:
+        delta["z"] = distance
+    elif "backward" in text_lower or "back" in text_lower:
+        delta["z"] = -distance
     else:
         return None  # Not a recognized movement command
     
