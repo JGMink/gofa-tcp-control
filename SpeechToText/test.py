@@ -36,6 +36,9 @@ except ImportError:
 # CONFIG
 # 
 
+# Scale factor: converts centimeters to Unity units
+DISTANCE_SCALE = 0.1  # 1 cm = 0.01 meters in Unity
+
 # Azure Speech credentials
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
@@ -154,6 +157,9 @@ def parse_movement_command(text: str):
         distance = distance / 10.0
     
     delta = {"x": 0.0, "y": 0.0, "z": 0.0}
+
+    # Scale to Unity units (centimeters to meters)
+    distance = distance * DISTANCE_SCALE
     
     # Determine direction - check for "go" or "move" variations
     if "right" in text_lower:
