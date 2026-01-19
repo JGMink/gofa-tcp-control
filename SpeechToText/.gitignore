@@ -1,7 +1,0 @@
-.env
-
-# files during active commands
-
-tcp_commands_detailed.json
-asr_luis_log.jsonl
-tcp_commands.json
