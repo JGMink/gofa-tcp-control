@@ -87,7 +87,7 @@ EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
 
 # Command queue file
 COMMAND_QUEUE_FILE = "../../UnityProject/tcp_commands.json"
-LOG_FILE = "asr_luis_log.jsonl"
+LOG_FILE = "../asr_luis_log.jsonl"
 
 # Ensure the output directory exists
 import pathlib
