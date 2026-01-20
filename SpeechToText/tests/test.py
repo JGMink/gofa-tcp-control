@@ -80,7 +80,7 @@ PHRASE_LIST = [
 EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency"]
 
 # Program termination words
-EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
+EXIT_WORDS = ["stop", "exit", "quit", "shutdown", "terminate"]
 
 # Command queue file
 COMMAND_QUEUE_FILE = "../../UnityProject/tcp_commands.json"
