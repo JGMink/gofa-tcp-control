@@ -80,10 +80,11 @@ PHRASE_LIST = [
 EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency"]
 
 # Program termination words
-EXIT_WORDS = ["stop", "exit", "quit", "shutdown", "terminate"]
+EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
 
 # Command queue file
-COMMAND_QUEUE_FILE = "../../UnityProject/tcp_commands.json"
+COMMAND_QUEUE_FILE = "../UnityProject/tcp_commands.json"
+TCP_POSITION_FILE = "../UnityProject/tcp_current_position.json"
 LOG_FILE = "asr_luis_log.jsonl"
 
 # Global command queue and emergency state
@@ -94,6 +95,32 @@ emergency_halt = threading.Event()
 # Current TCP position tracking
 current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
 position_lock = threading.Lock()
+
+
+def read_initial_tcp_position():
+    """
+    Read the current TCP position from Unity at startup.
+    Returns the position dict if successful, otherwise returns default position.
+    """
+    try:
+        if os.path.exists(TCP_POSITION_FILE):
+            with open(TCP_POSITION_FILE, 'r') as f:
+                position = json.load(f)
+                # Validate that we have x, y, z keys
+                if all(key in position for key in ['x', 'y', 'z']):
+                    print(f"✅ [LOADED] Initial TCP position from Unity: {position}")
+                    return position
+                else:
+                    print(f"⚠️ [WARNING] Invalid position format in {TCP_POSITION_FILE}")
+                    return {"x": 0.0, "y": 0.567, "z": -0.24}
+        else:
+            print(f"⚠️ [WARNING] TCP position file not found: {TCP_POSITION_FILE}")
+            print(f"   Using default position. Make sure Unity writes to this file.")
+            return {"x": 0.0, "y": 0.567, "z": -0.24}
+    except Exception as e:
+        print(f"⚠️ [ERROR] Could not read TCP position: {e}")
+        print(f"   Using default position.")
+        return {"x": 0.0, "y": 0.567, "z": -0.24}
 
 
 # 
@@ -209,7 +236,7 @@ def process_multi_command_sentence(text: str):
                     "command_text": cmd,
                     "delta": delta
                 })
-                print(f"  └─ Parsed: '{cmd}' -> {delta} -> Position: {temp_position}")
+                print(f"  â””â”€ Parsed: '{cmd}' -> {delta} -> Position: {temp_position}")
     
     return positions
 
@@ -239,7 +266,7 @@ def add_positions_to_queue(positions: list):
         # Write positions to JSON file
         save_command_queue()
         
-        print(f"✅ [ADDED {len(positions)} COMMANDS] Total in queue: {len(command_queue)}")
+        print(f"âœ… [ADDED {len(positions)} COMMANDS] Total in queue: {len(command_queue)}")
 
 
 def add_emergency_halt():
@@ -254,7 +281,7 @@ def add_emergency_halt():
         }
         command_queue.append(command)
         save_command_queue()
-        print(f"🛑 [EMERGENCY HALT ADDED] Total commands: {len(command_queue)}")
+        print(f"ðŸ›‘ [EMERGENCY HALT ADDED] Total commands: {len(command_queue)}")
 
 # Multiple Command Version: save full command queue to JSON
 # def save_command_queue():
@@ -440,7 +467,7 @@ class MicToAzureStream:
         
         # CRITICAL: Check for emergency words in partial recognition
         if check_for_emergency_words(text):
-            print(f"\n🚨 [EMERGENCY DETECTED IN PARTIAL] '{text}' - HALTING NOW!")
+            print(f"\nðŸš¨ [EMERGENCY DETECTED IN PARTIAL] '{text}' - HALTING NOW!")
             emergency_halt.set()
             add_emergency_halt()
 
@@ -452,14 +479,14 @@ class MicToAzureStream:
             
             # Check for exit words FIRST (highest priority)
             if check_for_exit_words(text):
-                print(f"\n🛑 Exit command detected: '{text}' - Shutting down program...\n")
+                print(f"\nðŸ›‘ Exit command detected: '{text}' - Shutting down program...\n")
                 self.stop()  # Stop recognizer immediately
                 self.stop_event.set()
                 return
             
             # Check for emergency words (in case partial didn't catch it)
             if check_for_emergency_words(text) and not emergency_halt.is_set():
-                print(f"🚨 [EMERGENCY HALT] '{text}' - Stopping all commands!")
+                print(f"ðŸš¨ [EMERGENCY HALT] '{text}' - Stopping all commands!")
                 emergency_halt.set()
                 add_emergency_halt()
                 return
@@ -571,19 +598,29 @@ def mic_capture_thread(stream_writer: MicToAzureStream, stop_event):
 # Main
 # 
 def main():
+    global current_position
+    
     print("="*60)
     print("Multi-Command Speech-to-Robot Position Queue System")
     print("="*60)
     
+    # Read initial TCP position from Unity
+    print("\n[INITIALIZATION] Reading current TCP position from Unity...")
+    initial_position = read_initial_tcp_position()
+    
+    with position_lock:
+        current_position = initial_position.copy()
+    
     if not USE_CLU:
-        print("\n⚠️  CLU is DISABLED - only speech recognition active\n")
+        print("\nâš ï¸  CLU is DISABLED - only speech recognition active\n")
     elif not CLU_SDK_AVAILABLE:
-        print("\n⚠️  CLU SDK not installed")
+        print("\nâš ï¸  CLU SDK not installed")
         print("    To enable CLU: pip install azure-ai-language-conversations\n")
     
     print(f"Emergency halt words: {EMERGENCY_WORDS}")
     print(f"Exit program words: {EXIT_WORDS}")
     print(f"Command queue file: {COMMAND_QUEUE_FILE}")
+    print(f"TCP position file: {TCP_POSITION_FILE}")
     print(f"Starting position: {current_position}\n")
     
     # Initialize empty command queue file
