@@ -10,5 +10,8 @@ azure-cognitiveservices-speech>=1.37.0
 azure-ai-language-conversations>=1.1.0
 azure-core>=1.30.0
 
-# Install dotenv
+# Environment configuration
 python-dotenv>=1.0.1
+
+# LLM Integration (for SpeechToText_learning.py)
+anthropic>=0.39.0

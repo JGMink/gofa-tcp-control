@@ -1,6 +1,6 @@
 """
-Azure Speech-to-Text with Learning System Integration.
-Uses phrase bank for known commands, falls back to LLM for unknown phrases.
+Azure Speech-to-Text with Self-Learning Command System.
+Uses phrase bank → fuzzy matching → LLM fallback architecture.
 """
 
 import queue
@@ -8,7 +8,6 @@ import threading
 import time
 import sys
 import json
-import re
 from collections import deque
 from datetime import datetime
 
@@ -19,34 +18,16 @@ import azure.cognitiveservices.speech as speechsdk
 from dotenv import load_dotenv
 import os
 
-# Import the learning system
-from learning import get_processor, get_phrase_bank, get_executor
+from learning.command_processor import CommandProcessor
+from intent_executor import IntentExecutor
 
 load_dotenv()
 
-
-# Try to import CLU SDK (optional - now secondary to phrase bank)
-try:
-    from azure.core.credentials import AzureKeyCredential
-    from azure.ai.language.conversations import ConversationAnalysisClient
-    CLU_SDK_AVAILABLE = True
-except ImportError:
-    CLU_SDK_AVAILABLE = False
-    print("INFO: Azure CLU SDK not installed (optional). Install with: pip install azure-ai-language-conversations")
-
-
-# 
+#
 # CONFIG
-# 
+#
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
-
-# CLU Configuration (optional, phrase bank is primary)
-CLU_ENDPOINT = os.getenv("CLU_ENDPOINT")
-CLU_KEY = os.getenv("CLU_KEY")
-CLU_PROJECT = os.getenv("CLU_PROJECT")
-CLU_DEPLOYMENT = os.getenv("CLU_DEPLOYMENT")
-USE_CLU = os.getenv("USE_CLU", "false").lower() == "true"  # Default off now
 
 if not AZURE_SPEECH_KEY or not AZURE_SPEECH_REGION:
     raise RuntimeError("Missing Azure Speech credentials. Check your .env file.")
@@ -63,353 +44,267 @@ VAD_MODE = 2
 PRE_SPEECH_FRAMES = 10
 SILENCE_TIMEOUT_SECS = 0.8
 
-# Phrase list for Azure STT boosting
+# Phrase list for Azure Speech boost
 PHRASE_LIST = [
     "GoFa", "pick", "place", "move to", "speed", "stop", "start",
     "move right", "move left", "move up", "move down",
     "move forward", "move backward", "centimeters", "millimeters",
     "halt", "wait", "pause", "emergency", "go right", "go left",
-    "go up", "go down", "go forward", "go backward",
-    "go back", "previous position", "grab", "release", "let go",
-    "pick up", "put down", "home", "yes", "no"
+    "go up", "go down", "go forward", "go backward", "go back",
+    "go home", "open gripper", "close gripper", "save this"
 ]
 
-# EMERGENCY halt words - checked in partial recognition for immediate response
-EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency", "freeze"]
+# EMERGENCY halt words (checked in partial recognition)
+EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency"]
 
 # Program termination words
 EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
 
-# Log file
+# Command queue file
+COMMAND_QUEUE_FILE = "../UnityProject/tcp_commands.json"
+TCP_POSITION_FILE = "../UnityProject/tcp_current_position.json"
 LOG_FILE = "asr_learning_log.jsonl"
 
+# Global emergency state
+emergency_halt = threading.Event()
 
-# 
-# CLU call (optional, secondary to phrase bank)
-# 
-def call_clu_predict_sdk(text: str):
-    """Call Azure CLU using the Python SDK."""
-    if not USE_CLU:
-        return None
-    
-    if not CLU_SDK_AVAILABLE:
-        return None
-    
+
+def read_initial_tcp_position():
+    """Read the current TCP position from Unity at startup."""
     try:
-        endpoint = CLU_ENDPOINT.rstrip('/')
-        client = ConversationAnalysisClient(endpoint, AzureKeyCredential(CLU_KEY))
-        
-        task = {
-            "kind": "Conversation",
-            "analysisInput": {
-                "conversationItem": {
-                    "participantId": "1",
-                    "id": "1",
-                    "modality": "text",
-                    "language": "en",
-                    "text": text
-                }
-            },
-            "parameters": {
-                "projectName": CLU_PROJECT,
-                "deploymentName": CLU_DEPLOYMENT,
-                "verbose": True
-            }
-        }
-        
-        result = client.analyze_conversation(task)
-        return result
-        
+        if os.path.exists(TCP_POSITION_FILE):
+            with open(TCP_POSITION_FILE, 'r') as f:
+                position = json.load(f)
+                print(f"✓ Loaded initial TCP position: {position}")
+                return position
     except Exception as e:
-        print(f"CLU Error: {e}")
-        return None
+        print(f"Warning: Could not read TCP position file: {e}")
+
+    default_position = {"x": 0.0, "y": 0.0, "z": 0.0}
+    print(f"Using default position: {default_position}")
+    return default_position
 
 
-def check_for_emergency_words(text: str) -> bool:
-    """Check if text contains any emergency halt words."""
-    text_lower = text.lower().strip()
-    for word in EMERGENCY_WORDS:
-        if re.search(r'\b' + re.escape(word) + r'\b', text_lower):
-            return True
-    return False
+def log_recognition(text: str, result: dict):
+    """Log recognition results to JSONL file."""
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "text": text,
+        "emergency_halt": emergency_halt.is_set(),
+        "result": result
+    }
+
+    try:
+        with open(LOG_FILE, 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception as e:
+        print(f"Warning: Could not write to log file: {e}")
 
 
-def check_for_exit_words(text: str) -> bool:
-    """Check if text contains program exit words."""
-    text_lower = text.lower()
-    for word in EXIT_WORDS:
-        if word in text_lower:
-            return True
-    return False
-
-
-# 
+#
 # Audio stream handler
-# 
+#
 class MicToAzureStream:
-    def __init__(self, speech_key, region, stop_event):
+    def __init__(self, speech_key, region, stop_event, command_processor):
         self.stop_event = stop_event
-        self.processor = get_processor()
-        self.executor = get_executor()
-        
+        self.command_processor = command_processor
+
         # Azure stream setup
         self.push_stream = speechsdk.audio.PushAudioInputStream()
-        audio_format = speechsdk.audio.AudioStreamFormat(
-            samples_per_second=SAMPLE_RATE, 
-            bits_per_sample=16, 
-            channels=CHANNELS
-        )
-        audio_input = speechsdk.audio.AudioConfig(stream=self.push_stream)
-
+        audio_config = speechsdk.audio.AudioConfig(stream=self.push_stream)
         speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=region)
-        speech_config.output_format = speechsdk.OutputFormat.Simple
-        speech_config.speech_recognition_language = "en-US"
+
+        # Add phrase list to boost recognition
+        phrase_list_grammar = speechsdk.PhraseListGrammar.from_recognizer(
+            speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+        )
+        for phrase in PHRASE_LIST:
+            phrase_list_grammar.addPhrase(phrase)
 
         self.recognizer = speechsdk.SpeechRecognizer(
-            speech_config=speech_config, 
-            audio_config=audio_input
+            speech_config=speech_config,
+            audio_config=audio_config
         )
 
-        # Attach callbacks
+        # Connect callbacks
         self.recognizer.recognizing.connect(self._on_recognizing)
         self.recognizer.recognized.connect(self._on_recognized)
+        self.recognizer.session_started.connect(lambda evt: print("Azure session started"))
+        self.recognizer.session_stopped.connect(lambda evt: print("Azure session stopped"))
         self.recognizer.canceled.connect(self._on_canceled)
-        self.recognizer.session_started.connect(lambda evt: print("[Session started]"))
-        self.recognizer.session_stopped.connect(lambda evt: print("[Session stopped]"))
 
-        # Apply phrase list
-        self._apply_phrase_list(self.recognizer)
-
-        # Start recognition
-        self.recognizer.start_continuous_recognition()
-        print("Azure recognizer started (continuous).")
-
-    def _apply_phrase_list(self, recognizer):
-        try:
-            plist = speechsdk.PhraseListGrammar.from_recognizer(recognizer)
-            for p in PHRASE_LIST:
-                plist.addPhrase(p)
-            print(f"Applied phrase list boosting ({len(PHRASE_LIST)} phrases)")
-        except Exception as e:
-            print("Could not apply phrase list:", e)
-
-    def write_audio(self, pcm_bytes: bytes):
-        try:
-            self.push_stream.write(pcm_bytes)
-        except Exception as e:
-            print("Error writing audio:", e)
-
-    def stop(self):
-        try:
-            self.recognizer.stop_continuous_recognition()
-        except Exception:
-            pass
-        try:
-            self.push_stream.close()
-        except Exception:
-            pass
+        # Mic and VAD setup
+        self.vad = webrtcvad.Vad(VAD_MODE)
+        self.audio_queue = queue.Queue()
+        self.is_speech_active = False
+        self.silence_start = None
+        self.pre_speech_buffer = deque(maxlen=PRE_SPEECH_FRAMES)
 
     def _on_recognizing(self, evt):
-        """Handle partial recognition - check for emergency words immediately!"""
-        text = evt.result.text
-        print(f"[Partial] {text}", end='\r')
-        
-        # CRITICAL: Check for emergency words in partial recognition
-        if check_for_emergency_words(text):
-            print(f"\n🚨 [EMERGENCY DETECTED] '{text}' - HALTING NOW!")
-            self.executor.execute("emergency_stop", {})
+        """Called during partial recognition - check for emergency words."""
+        partial_text = evt.result.text.lower()
+
+        # Check for emergency halt words in partial recognition
+        if any(word in partial_text for word in EMERGENCY_WORDS):
+            print(f"\n⚠️  EMERGENCY HALT detected in partial: '{evt.result.text}'")
+            emergency_halt.set()
+            # Execute emergency stop through command processor
+            self.command_processor.process_command("emergency stop")
 
     def _on_recognized(self, evt):
+        """Called when final recognition result is available."""
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            text = evt.result.text.strip()
-            timestamp = time.time()
-            
-            if not text:
-                return
-                
-            print(f"\n[Recognized] {text}")
-            
-            # Check for exit words FIRST (highest priority)
-            if check_for_exit_words(text):
-                print(f"\n🛑 Exit command detected: '{text}' - Shutting down...\n")
-                self.stop()
+            text = evt.result.text
+            text_lower = text.lower()
+
+            print(f"\n🎤 Recognized: \"{text}\"")
+
+            # Check for exit words
+            if any(exit_word in text_lower for exit_word in EXIT_WORDS):
+                print("Shutdown command detected. Exiting...")
+                # Print final statistics
+                self.command_processor.print_stats()
                 self.stop_event.set()
                 return
-            
-            # Check for emergency words (in case partial didn't catch it)
-            if check_for_emergency_words(text):
-                print(f"🚨 [EMERGENCY HALT] '{text}'")
-                self.executor.execute("emergency_stop", {})
+
+            # Check for emergency halt
+            if any(word in text_lower for word in EMERGENCY_WORDS):
+                print(f"⚠️  EMERGENCY HALT: '{text}'")
+                emergency_halt.set()
+                success = self.command_processor.process_command("emergency stop")
+                log_recognition(text, {"action": "emergency_halt", "success": success})
                 return
-            
-            # Process through the learning system
-            clu_result = None
-            if USE_CLU:
-                clu_result = call_clu_predict_sdk(text)
-            
-            result = self.processor.process(text, clu_result=clu_result)
-            
-            # Handle the result
-            if result["success"]:
-                msg = f"✅ {result['message']}"
-                if result.get("learned"):
-                    msg += " 📚"
-                print(msg)
-            elif result.get("needs_confirmation"):
-                print(f"❓ {result['confirmation_prompt']}")
-            else:
-                print(f"❌ {result['message']}")
-            
-            # Log to file
-            with open(LOG_FILE, "a", encoding="utf-8") as fh:
-                record = {
-                    "timestamp": timestamp,
-                    "text": text,
-                    "result": result,
-                    "state": self.executor.get_state()
-                }
-                fh.write(json.dumps(record) + "\n")
-                
+
+            # Process through learning system
+            try:
+                success = self.command_processor.process_command(text)
+                log_recognition(text, {"success": success})
+
+            except Exception as e:
+                print(f"✗ Error processing command: {e}")
+                log_recognition(text, {"success": False, "error": str(e)})
+
         elif evt.result.reason == speechsdk.ResultReason.NoMatch:
-            pass  # Silence, don't print
+            print("No speech recognized")
 
     def _on_canceled(self, evt):
-        print(f"[Canceled] Reason: {evt.reason}")
-        if evt.result and evt.result.cancellation_details:
-            print("Details:", evt.result.cancellation_details.error_details)
+        """Called if recognition is canceled."""
+        print(f"Recognition canceled: {evt}")
+        if evt.reason == speechsdk.CancellationReason.Error:
+            print(f"Error details: {evt.error_details}")
+            self.stop_event.set()
 
-
-# 
-# Microphone capture + VAD
-# 
-def mic_capture_thread(stream_writer: MicToAzureStream, stop_event):
-    q = queue.Queue()
-
-    def callback(indata, frames, time_info, status):
+    def mic_callback(self, indata, frames, time_info, status):
+        """Sounddevice callback - receives raw audio from microphone."""
         if status:
-            print(status)
-        q.put_nowait(bytes(indata))
+            print(f"Mic status: {status}")
 
-    ring = deque(maxlen=PRE_SPEECH_FRAMES)
-    vad = webrtcvad.Vad(VAD_MODE)
-    voiced = False
-    silence_since = None
+        audio_bytes = (indata * 32767).astype(np.int16).tobytes()
+        self.audio_queue.put(audio_bytes)
 
-    with sd.RawInputStream(
-        samplerate=SAMPLE_RATE, 
-        blocksize=FRAME_SIZE, 
-        dtype='int16',
-        channels=CHANNELS, 
-        callback=callback
-    ):
-        print("Mic stream opened. Speak into the microphone.\n")
-        
-        try:
-            while not stop_event.is_set():
-                try:
-                    pcm_bytes = q.get(timeout=0.1)
-                except queue.Empty:
-                    continue
-                
-                if len(pcm_bytes) != FRAME_SIZE * BYTES_PER_SAMPLE:
-                    continue
+    def process_audio(self):
+        """Process audio from queue, apply VAD, and push to Azure."""
+        while not self.stop_event.is_set():
+            try:
+                audio_chunk = self.audio_queue.get(timeout=0.1)
 
-                is_speech = vad.is_speech(pcm_bytes, SAMPLE_RATE)
-                ring.append(pcm_bytes)
+                # VAD check
+                is_speech = self.vad.is_speech(audio_chunk, SAMPLE_RATE)
 
                 if is_speech:
-                    if not voiced:
-                        for pre in ring:
-                            stream_writer.write_audio(pre)
-                        voiced = True
-                        silence_since = None
-                    stream_writer.write_audio(pcm_bytes)
+                    if not self.is_speech_active:
+                        # Speech started - flush pre-speech buffer
+                        self.is_speech_active = True
+                        for buffered_chunk in self.pre_speech_buffer:
+                            self.push_stream.write(buffered_chunk)
+                        self.pre_speech_buffer.clear()
+
+                    self.push_stream.write(audio_chunk)
+                    self.silence_start = None
+
                 else:
-                    if voiced:
-                        if silence_since is None:
-                            silence_since = time.time()
-                        elif time.time() - silence_since > SILENCE_TIMEOUT_SECS:
-                            voiced = False
-                            silence_since = None
+                    if self.is_speech_active:
+                        # In speech, but this frame is silence
+                        self.push_stream.write(audio_chunk)
 
-        except KeyboardInterrupt:
-            print("Mic capture interrupted.")
-        except Exception as e:
-            print("Exception in mic thread:", e)
+                        if self.silence_start is None:
+                            self.silence_start = time.time()
+                        elif time.time() - self.silence_start > SILENCE_TIMEOUT_SECS:
+                            # Silence timeout - speech ended
+                            self.is_speech_active = False
+                            self.silence_start = None
+                    else:
+                        # Not in speech - buffer for potential upcoming speech
+                        self.pre_speech_buffer.append(audio_chunk)
+
+            except queue.Empty:
+                continue
+
+    def start(self):
+        """Start recognition."""
+        print("Starting self-learning speech recognition...")
+
+        # Start Azure recognizer
+        self.recognizer.start_continuous_recognition()
+
+        # Start audio processing thread
+        audio_thread = threading.Thread(target=self.process_audio, daemon=True)
+        audio_thread.start()
+
+        # Start microphone stream
+        with sd.InputStream(
+            samplerate=SAMPLE_RATE,
+            channels=CHANNELS,
+            dtype='float32',
+            blocksize=FRAME_SIZE,
+            callback=self.mic_callback
+        ):
+            print("Listening... (Say 'exit program' to quit)")
+            while not self.stop_event.is_set():
+                time.sleep(0.1)
+
+        # Cleanup
+        self.recognizer.stop_continuous_recognition()
+        print("Recognition stopped")
 
 
-# 
-# Main
-# 
 def main():
-    print("="*60)
-    print("Voice-Controlled Robot with Learning System")
-    print("="*60)
-    
-    # Initialize components
-    phrase_bank = get_phrase_bank()
-    executor = get_executor()
-    
-    print(f"\nLoaded {len(phrase_bank.get_all_phrases())} phrases")
-    print(f"Known intents: {list(phrase_bank.get_all_intents().keys())}")
-    print(f"Known locations: {list(phrase_bank.get_all_locations().keys())}")
-    
-    if USE_CLU:
-        print(f"\nCLU: Enabled (secondary to phrase bank)")
-    else:
-        print(f"\nCLU: Disabled (phrase bank + LLM only)")
-    
-    print(f"\nEmergency halt words: {EMERGENCY_WORDS}")
-    print(f"Exit program words: {EXIT_WORDS}")
-    print(f"Starting position: {executor.current_position}")
-    print("\n" + "-"*60)
-    print("Try saying:")
-    print("  • 'move right 5 centimeters'")
-    print("  • 'go up and then go left'")
-    print("  • 'go back' (returns to previous position)")
-    print("  • 'go home'")
-    print("  • Or try something new - I'll learn it!")
-    print("-"*60 + "\n")
-    
+    """Main entry point."""
+    print("\n" + "="*60)
+    print("Azure Speech-to-Text with Self-Learning System")
+    print("="*60 + "\n")
+
+    # Read initial TCP position
+    initial_position = read_initial_tcp_position()
+
+    # Initialize intent executor
+    executor = IntentExecutor(
+        command_queue_file=COMMAND_QUEUE_FILE,
+        initial_position=initial_position
+    )
+
+    # Initialize command processor
+    processor = CommandProcessor(executor, enable_llm=True)
+
+    print("\n📚 Phrase Bank Loaded:")
+    stats = processor.phrase_bank.get_stats()
+    print(f"  Total phrases: {stats['total_phrases']}")
+    print(f"  Named locations: {stats['named_locations']}")
+
+    # Create stop event
     stop_event = threading.Event()
-    stream_writer = None
-    
+
+    # Create and start the stream
+    stream = MicToAzureStream(AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, stop_event, processor)
+
     try:
-        stream_writer = MicToAzureStream(
-            speech_key=AZURE_SPEECH_KEY, 
-            region=AZURE_SPEECH_REGION,
-            stop_event=stop_event
-        )
-
-        # Start mic capture thread
-        mic_thread = threading.Thread(
-            target=mic_capture_thread, 
-            args=(stream_writer, stop_event), 
-            daemon=True
-        )
-        mic_thread.start()
-
-        while not stop_event.is_set():
-            time.sleep(0.1)
-            
+        stream.start()
     except KeyboardInterrupt:
-        print("\nKeyboard interrupt received...")
+        print("\nInterrupted by user")
     finally:
-        if not stop_event.is_set():
-            stop_event.set()
-        if stream_writer:
-            stream_writer.stop()
-        time.sleep(0.3)
-        
-        # Final state
-        state = executor.get_state()
-        print("\n" + "="*60)
-        print("Program stopped.")
-        print(f"Final position: {state['current_position']}")
-        print(f"Commands executed: {state['queue_length']}")
-        print(f"Emergency halt: {state['emergency_halt']}")
-        print(f"Phrases in bank: {len(phrase_bank.get_all_phrases())}")
-        print("="*60)
+        stop_event.set()
+        print("\nShutting down...")
+        processor.print_stats()
 
 
 if __name__ == "__main__":

@@ -1,236 +1,241 @@
 """
-Phrase Bank - Manages vocabulary mapping phrases to intents.
-Supports exact matching, fuzzy matching, and runtime learning.
+Phrase Bank Manager with fuzzy matching for self-learning vocabulary system.
+Handles lookup, fuzzy matching, and persistence of learned phrases.
 """
-
 import json
-import re
-from datetime import datetime
+import os
+from typing import Optional, Dict, Tuple
 from difflib import SequenceMatcher
-from typing import Optional, Tuple, Dict, Any, List
 
-from .config import (
-    PHRASE_BANK_PATH,
-    FUZZY_MATCH_THRESHOLD,
-    FUZZY_CONFIRM_THRESHOLD,
-    ENABLE_FUZZY_MATCHING,
-    VERBOSE_LOGGING
-)
+from .config import FUZZY_MATCH_THRESHOLD
+
+PHRASE_BANK_PATH = os.path.join(os.path.dirname(__file__), "phrase_bank.json")
 
 
 class PhraseBank:
-    def __init__(self, path: str = None):
-        self.path = path or PHRASE_BANK_PATH
+    """
+    Manages learned phrases with fuzzy matching capabilities.
+    Grows over time as new phrases are learned from LLM interpretations.
+    """
+
+    def __init__(self, auto_save=True):
+        """
+        Initialize phrase bank.
+
+        Args:
+            auto_save: Automatically save to disk when phrases are added
+        """
+        self.auto_save = auto_save
         self.data = self._load()
-        
-    def _load(self) -> dict:
+
+    def _load(self) -> Dict:
         """Load phrase bank from JSON file."""
         try:
-            with open(self.path, 'r', encoding='utf-8') as f:
+            with open(PHRASE_BANK_PATH, 'r') as f:
                 return json.load(f)
         except FileNotFoundError:
-            print(f"[PhraseBank] No phrase bank found at {self.path}, starting fresh")
-            return {
-                "meta": {"version": 1, "last_updated": datetime.now().isoformat()},
-                "intents": {},
-                "phrases": {},
-                "locations": {}
-            }
+            print(f"Warning: Phrase bank not found at {PHRASE_BANK_PATH}")
+            return self._create_default()
         except json.JSONDecodeError as e:
-            print(f"[PhraseBank] Error loading phrase bank: {e}")
-            return {"meta": {}, "intents": {}, "phrases": {}, "locations": {}}
-    
-    def save(self):
-        """Save phrase bank to JSON file."""
-        self.data["meta"]["last_updated"] = datetime.now().isoformat()
-        with open(self.path, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, indent=2)
-        if VERBOSE_LOGGING:
-            print(f"[PhraseBank] Saved to {self.path}")
-    
-    @staticmethod
-    def normalize(text: str) -> str:
-        """Normalize text for matching."""
-        text = text.lower().strip()
-        # Remove punctuation except hyphens
-        text = re.sub(r'[^\w\s\-]', '', text)
-        # Collapse multiple spaces
-        text = re.sub(r'\s+', ' ', text)
-        return text
-    
-    @staticmethod
-    def similarity(a: str, b: str) -> float:
-        """Calculate similarity ratio between two strings."""
-        return SequenceMatcher(None, a, b).ratio()
-    
-    def extract_distance(self, text: str) -> Tuple[str, Optional[float]]:
-        """
-        Extract distance from text if present.
-        Returns (text_without_distance, distance_value or None)
-        """
-        text_lower = text.lower()
-        
-        # Match patterns like "5 centimeters", "10 cm", "3.5 millimeters"
-        pattern = r'(\d+(?:\.\d+)?)\s*(?:centimeters?|cm|millimeters?|mm)?'
-        match = re.search(pattern, text_lower)
-        
-        if match:
-            distance = float(match.group(1))
-            # Convert mm to cm
-            if 'millimeter' in text_lower or 'mm' in text_lower:
-                distance = distance / 10.0
-            # Remove the distance part from text for phrase matching
-            text_without_distance = re.sub(pattern, '', text_lower).strip()
-            text_without_distance = re.sub(r'\s+', ' ', text_without_distance)
-            return text_without_distance, distance
-        
-        return text_lower, None
-    
-    def lookup(self, utterance: str) -> Tuple[Optional[Dict[str, Any]], float, bool]:
-        """
-        Look up an utterance in the phrase bank.
-        
-        Returns:
-            (match_result, confidence, needs_confirmation)
-            - match_result: {intent, parameters, source} or None
-            - confidence: 0.0 to 1.0
-            - needs_confirmation: True if we should ask user to confirm
-        """
-        # Extract distance first (so "move right 5 cm" matches "move right")
-        text_for_matching, extracted_distance = self.extract_distance(utterance)
-        normalized = self.normalize(text_for_matching)
-        
-        if VERBOSE_LOGGING:
-            print(f"[PhraseBank] Looking up: '{normalized}' (distance: {extracted_distance})")
-        
-        # 1. Try exact match first
-        if normalized in self.data["phrases"]:
-            result = self.data["phrases"][normalized].copy()
-            # Merge extracted distance if applicable
-            if extracted_distance is not None and "direction" in result.get("parameters", {}):
-                result["parameters"]["distance"] = extracted_distance
-            if VERBOSE_LOGGING:
-                print(f"[PhraseBank] Exact match: {result['intent']}")
-            return result, 1.0, False
-        
-        # 2. Try fuzzy matching
-        if ENABLE_FUZZY_MATCHING:
-            best_match = None
-            best_score = 0.0
-            best_phrase = None
-            
-            for phrase, data in self.data["phrases"].items():
-                score = self.similarity(normalized, phrase)
-                if score > best_score:
-                    best_score = score
-                    best_match = data
-                    best_phrase = phrase
-            
-            if best_score >= FUZZY_MATCH_THRESHOLD:
-                result = best_match.copy()
-                if extracted_distance is not None and "direction" in result.get("parameters", {}):
-                    result["parameters"]["distance"] = extracted_distance
-                if VERBOSE_LOGGING:
-                    print(f"[PhraseBank] Fuzzy match: '{best_phrase}' ({best_score:.2f})")
-                return result, best_score, False
-            
-            elif best_score >= FUZZY_CONFIRM_THRESHOLD:
-                # Found something but not confident enough
-                result = best_match.copy()
-                if extracted_distance is not None and "direction" in result.get("parameters", {}):
-                    result["parameters"]["distance"] = extracted_distance
-                if VERBOSE_LOGGING:
-                    print(f"[PhraseBank] Low confidence match: '{best_phrase}' ({best_score:.2f}) - needs confirmation")
-                return result, best_score, True
-        
-        # 3. No match found
-        if VERBOSE_LOGGING:
-            print(f"[PhraseBank] No match found for: '{normalized}'")
-        return None, 0.0, False
-    
-    def add_phrase(self, phrase: str, intent: str, parameters: dict = None, 
-                   source: str = "learned", confirmed: bool = True) -> bool:
-        """
-        Add a new phrase to the bank.
-        
-        Returns True if added, False if phrase already exists.
-        """
-        normalized = self.normalize(phrase)
-        
-        if normalized in self.data["phrases"]:
-            if VERBOSE_LOGGING:
-                print(f"[PhraseBank] Phrase already exists: '{normalized}'")
-            return False
-        
-        self.data["phrases"][normalized] = {
-            "intent": intent,
-            "parameters": parameters or {},
-            "source": source,
-            "learned_at": datetime.now().isoformat(),
-            "confirmed": confirmed
+            print(f"Error loading phrase bank: {e}")
+            return self._create_default()
+
+    def _create_default(self) -> Dict:
+        """Create default phrase bank structure."""
+        return {
+            "phrases": {},
+            "named_locations": {"home": {"x": 0.0, "y": 0.0, "z": 0.0}},
+            "metadata": {
+                "version": "1.0",
+                "last_updated": "",
+                "total_phrases_learned": 0
+            }
         }
-        
-        self.save()
-        print(f"[PhraseBank] ✅ Learned: '{normalized}' → {intent}")
-        return True
-    
-    def add_location(self, name: str, position: dict) -> bool:
-        """Add or update a named location."""
-        name_lower = name.lower()
-        self.data["locations"][name_lower] = position
-        self.save()
-        print(f"[PhraseBank] 📍 Saved location '{name_lower}': {position}")
-        return True
-    
-    def get_location(self, name: str) -> Optional[dict]:
+
+    def save(self):
+        """Save phrase bank to disk."""
+        try:
+            with open(PHRASE_BANK_PATH, 'w') as f:
+                json.dump(self.data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving phrase bank: {e}")
+
+    def exact_match(self, phrase: str) -> Optional[Dict]:
+        """
+        Look for exact match in phrase bank.
+
+        Args:
+            phrase: Input phrase (case-insensitive)
+
+        Returns:
+            Intent dict if found, None otherwise
+        """
+        phrase_lower = phrase.lower().strip()
+        phrases = self.data.get("phrases", {})
+
+        if phrase_lower in phrases:
+            # Increment usage count
+            phrases[phrase_lower]["usage_count"] = phrases[phrase_lower].get("usage_count", 0) + 1
+            if self.auto_save:
+                self.save()
+            return phrases[phrase_lower]
+
+        return None
+
+    def fuzzy_match(self, phrase: str) -> Optional[Tuple[str, Dict, float]]:
+        """
+        Find best fuzzy match in phrase bank.
+
+        Args:
+            phrase: Input phrase
+
+        Returns:
+            Tuple of (matched_phrase, intent_dict, confidence) if confident match found
+            None otherwise
+        """
+        phrase_lower = phrase.lower().strip()
+        phrases = self.data.get("phrases", {})
+
+        if not phrases:
+            return None
+
+        best_match = None
+        best_ratio = 0.0
+        best_phrase = None
+
+        for known_phrase, intent_data in phrases.items():
+            ratio = SequenceMatcher(None, phrase_lower, known_phrase).ratio()
+
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_match = intent_data
+                best_phrase = known_phrase
+
+        # Only return if confidence exceeds threshold
+        if best_ratio >= FUZZY_MATCH_THRESHOLD:
+            # Increment usage count
+            best_match["usage_count"] = best_match.get("usage_count", 0) + 1
+            if self.auto_save:
+                self.save()
+            return (best_phrase, best_match, best_ratio)
+
+        return None
+
+    def add_phrase(self, phrase: str, intent: str, params: Dict, confidence: float = 0.95):
+        """
+        Add a new learned phrase to the bank.
+
+        Args:
+            phrase: Natural language phrase
+            intent: Intent name (e.g., "move_relative", "move_to_previous")
+            params: Intent parameters
+            confidence: Confidence score from LLM (0.0-1.0)
+        """
+        phrase_lower = phrase.lower().strip()
+        phrases = self.data.get("phrases", {})
+
+        # Add or update phrase
+        phrases[phrase_lower] = {
+            "intent": intent,
+            "params": params,
+            "confidence": confidence,
+            "usage_count": 1  # Start at 1 since we're using it now
+        }
+
+        # Update metadata
+        if phrase_lower not in phrases:
+            self.data["metadata"]["total_phrases_learned"] += 1
+
+        from datetime import datetime
+        self.data["metadata"]["last_updated"] = datetime.now().isoformat()
+
+        if self.auto_save:
+            self.save()
+
+        print(f"✓ Learned new phrase: '{phrase}' → {intent}")
+
+    def get_named_location(self, name: str) -> Optional[Dict]:
         """Get a named location's position."""
-        return self.data["locations"].get(name.lower())
-    
-    def get_intent_info(self, intent_name: str) -> Optional[dict]:
-        """Get information about an intent."""
-        return self.data["intents"].get(intent_name)
-    
-    def is_intent_implemented(self, intent_name: str) -> bool:
-        """Check if an intent is implemented."""
-        intent_info = self.get_intent_info(intent_name)
-        if intent_info is None:
-            return False
-        return intent_info.get("implemented", True)
-    
-    def get_not_implemented_message(self, intent_name: str) -> str:
-        """Get the 'not implemented' message for an intent."""
-        intent_info = self.get_intent_info(intent_name)
-        if intent_info:
-            return intent_info.get("not_implemented_message", 
-                                   f"The '{intent_name}' capability isn't available yet.")
-        return f"I don't know how to do '{intent_name}' yet."
-    
-    def get_all_intents(self) -> Dict[str, dict]:
-        """Get all defined intents."""
-        return self.data["intents"]
-    
-    def get_all_phrases(self) -> Dict[str, dict]:
-        """Get all phrases."""
-        return self.data["phrases"]
-    
-    def get_sample_phrases(self, n: int = 10) -> List[Tuple[str, str]]:
-        """Get sample phrases for LLM context."""
-        samples = []
-        for phrase, data in list(self.data["phrases"].items())[:n]:
-            samples.append((phrase, data["intent"]))
-        return samples
-    
-    def get_all_locations(self) -> Dict[str, dict]:
-        """Get all named locations."""
-        return self.data["locations"]
+        locations = self.data.get("named_locations", {})
+        return locations.get(name.lower())
+
+    def save_named_location(self, name: str, position: Dict):
+        """Save a named location."""
+        locations = self.data.get("named_locations", {})
+        locations[name.lower()] = position
+
+        if self.auto_save:
+            self.save()
+
+        print(f"✓ Saved location '{name}': {position}")
+
+    def get_stats(self) -> Dict:
+        """Get phrase bank statistics."""
+        phrases = self.data.get("phrases", {})
+        return {
+            "total_phrases": len(phrases),
+            "total_learned": self.data["metadata"].get("total_phrases_learned", 0),
+            "named_locations": len(self.data.get("named_locations", {})),
+            "most_used_phrase": self._get_most_used_phrase(),
+            "last_updated": self.data["metadata"].get("last_updated", "never")
+        }
+
+    def _get_most_used_phrase(self) -> Optional[str]:
+        """Find the most frequently used phrase."""
+        phrases = self.data.get("phrases", {})
+        if not phrases:
+            return None
+
+        most_used = max(
+            phrases.items(),
+            key=lambda x: x[1].get("usage_count", 0)
+        )
+
+        if most_used[1].get("usage_count", 0) > 0:
+            return most_used[0]
+
+        return None
 
 
-# Singleton instance
-_phrase_bank_instance = None
+def test_phrase_bank():
+    """Test phrase bank functionality."""
+    print("\n=== Phrase Bank Test ===\n")
 
-def get_phrase_bank() -> PhraseBank:
-    """Get the singleton PhraseBank instance."""
-    global _phrase_bank_instance
-    if _phrase_bank_instance is None:
-        _phrase_bank_instance = PhraseBank()
-    return _phrase_bank_instance
+    bank = PhraseBank(auto_save=False)
+
+    # Test exact match
+    print("1. Testing exact match:")
+    result = bank.exact_match("go back")
+    if result:
+        print(f"   ✓ Found: {result}")
+    else:
+        print("   ✗ Not found")
+
+    # Test fuzzy match
+    print("\n2. Testing fuzzy match:")
+    fuzzy = bank.fuzzy_match("go bak")  # Typo
+    if fuzzy:
+        phrase, intent, confidence = fuzzy
+        print(f"   ✓ Matched '{phrase}' with confidence {confidence:.2f}")
+        print(f"     Intent: {intent}")
+    else:
+        print("   ✗ No confident match")
+
+    # Test add phrase
+    print("\n3. Testing add phrase:")
+    bank.add_phrase(
+        "put it back where it was",
+        "move_to_previous",
+        {},
+        confidence=0.95
+    )
+
+    # Test stats
+    print("\n4. Phrase bank stats:")
+    stats = bank.get_stats()
+    for key, value in stats.items():
+        print(f"   {key}: {value}")
+
+
+if __name__ == "__main__":
+    test_phrase_bank()

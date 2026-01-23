@@ -1,27 +1,29 @@
 """
-Configuration for the learning system.
+Configuration for LLM-based intent interpretation.
 """
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Claude API (for LLM interpretation)
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-CLAUDE_MODEL = "claude-sonnet-4-20250514"  # Fast + capable
+# Anthropic Claude API configuration
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")  # Haiku is fast and cheap
 
-# Confidence thresholds (tune these as needed)
-FUZZY_MATCH_THRESHOLD = 0.75       # Minimum similarity for phrase bank match
-FUZZY_CONFIRM_THRESHOLD = 0.60    # Below this, ask for confirmation
-CLU_CONFIDENCE_THRESHOLD = 0.70    # Minimum CLU confidence to trust
-LLM_CONFIDENCE_THRESHOLD = 0.80    # LLM confidence to auto-learn (vs confirm)
+# Distance scale (should match main config)
+DISTANCE_SCALE = 0.01  # Centimeters to Unity units
 
-# Paths
-PHRASE_BANK_PATH = os.path.join(os.path.dirname(__file__), "phrase_bank.json")
-COMMAND_QUEUE_FILE = os.path.join(os.path.dirname(__file__), "../../UnityProject/tcp_commands.json")
+# Emergency and exit words
+EMERGENCY_WORDS = ["stop", "halt", "wait", "pause", "emergency"]
+EXIT_WORDS = ["exit program", "quit program", "shutdown", "terminate"]
 
-# Feature flags
-ENABLE_FUZZY_MATCHING = True
-ENABLE_LLM_FALLBACK = True
-SILENT_LEARNING = True  # Learn without confirmation if confident
-VERBOSE_LOGGING = True
+# Default movement distance when not specified
+DEFAULT_DISTANCE_CM = 1.0
+
+# Fuzzy matching threshold (0.0-1.0)
+# Higher = more strict, Lower = more lenient
+FUZZY_MATCH_THRESHOLD = float(os.getenv("FUZZY_MATCH_THRESHOLD", "0.85"))
+
+# LLM confidence threshold for auto-learning
+# Only save phrases if LLM is this confident
+LLM_CONFIDENCE_THRESHOLD = float(os.getenv("LLM_CONFIDENCE_THRESHOLD", "0.90"))

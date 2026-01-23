@@ -1,210 +1,189 @@
 """
-LLM Interpreter - Calls Claude API to understand unknown utterances.
+LLM-based voice command interpreter using Anthropic Claude API.
+Extracts structured intents from natural language commands.
 """
-
 import json
-from typing import Optional, Dict, Any
+import os
+from typing import Optional, Dict
 
-from .config import (
-    CLAUDE_API_KEY,
-    CLAUDE_MODEL,
-    LLM_CONFIDENCE_THRESHOLD,
-    VERBOSE_LOGGING
-)
-from .phrase_bank import get_phrase_bank
-
-# Try to import anthropic
 try:
-    import anthropic
+    from anthropic import Anthropic
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
-    print("[LLMInterpreter] WARNING: anthropic package not installed. Install with: pip install anthropic")
+    print("WARNING: Anthropic SDK not installed. Install with: pip install anthropic")
 
-
-SYSTEM_PROMPT = """You are an interpreter for a robot arm voice control system. Your job is to understand what the user wants the robot to do and map it to known intents.
-
-You must respond with valid JSON only, no other text.
-
-Guidelines:
-1. Map the utterance to the most appropriate intent from the KNOWN INTENTS list
-2. Extract any parameters mentioned (direction, distance, location name)
-3. Provide a confidence score (0.0 to 1.0) for your interpretation
-4. If you can map it, suggest a normalized phrase to save for future use
-5. If the utterance doesn't map to any known intent, set "understood" to false
-
-For move_relative intents:
-- Directions: right, left, up, down, forward, backward
-- Distance is optional, extract if mentioned (in centimeters)
-
-For move_to_named intents:
-- Extract the location name from the utterance
-- If referencing "previous" or "last" position, use move_to_previous instead
-
-Be generous in interpretation - if the user's intent is clear even with unusual phrasing, map it."""
-
-
-USER_PROMPT_TEMPLATE = """KNOWN INTENTS:
-{intents_json}
-
-KNOWN LOCATIONS:
-{locations_json}
-
-SAMPLE PHRASES (for reference):
-{sample_phrases}
-
-CURRENT CONTEXT:
-- Robot position: {current_position}
-- Previous position: {previous_position}
-- Gripper state: {gripper_state}
-
-USER SAID: "{utterance}"
-
-Respond with JSON:
-{{
-  "understood": true/false,
-  "intent": "intent_name" or null,
-  "parameters": {{}},
-  "confidence": 0.0-1.0,
-  "phrase_to_save": "normalized phrase" or null,
-  "explanation": "brief explanation"
-}}"""
+from .config import (
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+    LLM_CONFIDENCE_THRESHOLD
+)
 
 
 class LLMInterpreter:
+    """
+    Uses Claude to interpret voice commands and extract structured intents.
+    Returns intent + parameters + confidence for learning system.
+    """
+
     def __init__(self):
-        self.client = None
-        if ANTHROPIC_AVAILABLE and CLAUDE_API_KEY:
-            self.client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
-        elif not CLAUDE_API_KEY:
-            print("[LLMInterpreter] WARNING: CLAUDE_API_KEY not set in environment")
-    
-    def interpret(self, 
-                  utterance: str, 
-                  current_position: dict = None,
-                  previous_position: dict = None,
-                  gripper_state: str = "unknown") -> Optional[Dict[str, Any]]:
+        if not ANTHROPIC_AVAILABLE:
+            raise ImportError("Anthropic SDK not installed")
+
+        if not ANTHROPIC_API_KEY:
+            raise ValueError("ANTHROPIC_API_KEY not set in environment")
+
+        self.client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        self.model = ANTHROPIC_MODEL
+
+    def _build_prompt(self, voice_command: str) -> str:
         """
-        Ask Claude to interpret an unknown utterance.
-        
+        Build prompt for Claude to extract intent from voice command.
+        """
+        prompt = f"""You are interpreting robot voice commands. Extract the intent and parameters.
+
+Available Intents:
+1. move_relative - Move in a direction by a distance
+   Parameters: direction (right/left/up/down/forward/backward), distance (float), unit (cm/mm)
+   Examples: "move right 5 cm", "go up", "shift left 10 centimeters"
+
+2. move_to_previous - Return to the last position
+   Parameters: (none)
+   Examples: "go back", "return to previous position", "put it back where it was"
+
+3. move_to_named - Move to a saved named location
+   Parameters: location (string)
+   Examples: "go home", "move to pickup position", "go to station A"
+
+4. emergency_stop - Immediately halt all movement
+   Parameters: (none)
+   Examples: "stop", "halt", "emergency"
+
+5. gripper_open - Open the gripper (future hardware)
+   Parameters: (none)
+   Examples: "open gripper", "release", "let go"
+
+6. gripper_close - Close the gripper (future hardware)
+   Parameters: (none)
+   Examples: "close gripper", "grab", "grip"
+
+7. save_named_location - Save current position with a name
+   Parameters: location (string)
+   Examples: "save this as home", "remember this as pickup"
+
+Return a JSON object with:
+{{
+  "intent": "intent_name",
+  "params": {{parameter_dict}},
+  "confidence": 0.95
+}}
+
+Important:
+- confidence should be 0.0-1.0 (how sure you are)
+- Use 1.0 for exact matches, 0.9-0.95 for clear interpretations, lower for ambiguous
+- For move_relative with no distance specified, use distance: 1.0, unit: "cm"
+- direction must be lowercase
+
+Command: "{voice_command}"
+
+JSON Response:"""
+
+        return prompt
+
+    def interpret_command(self, voice_command: str) -> Optional[Dict]:
+        """
+        Interpret a voice command and extract intent.
+
+        Args:
+            voice_command: Natural language command
+
         Returns:
-            {
-                "understood": bool,
-                "intent": str or None,
-                "parameters": dict,
-                "confidence": float,
-                "phrase_to_save": str or None,
-                "explanation": str,
-                "needs_confirmation": bool
-            }
+            Dict with {intent, params, confidence} or None if parsing fails
         """
-        if not self.client:
-            print("[LLMInterpreter] No client available (missing API key or package)")
-            return {
-                "understood": False,
-                "intent": None,
-                "parameters": {},
-                "confidence": 0.0,
-                "phrase_to_save": None,
-                "explanation": "LLM interpreter not available",
-                "needs_confirmation": False
-            }
-        
-        phrase_bank = get_phrase_bank()
-        
-        # Build context
-        intents_json = json.dumps(phrase_bank.get_all_intents(), indent=2)
-        locations_json = json.dumps(phrase_bank.get_all_locations(), indent=2)
-        sample_phrases = "\n".join([f"  '{p}' → {i}" for p, i in phrase_bank.get_sample_phrases(15)])
-        
-        user_prompt = USER_PROMPT_TEMPLATE.format(
-            intents_json=intents_json,
-            locations_json=locations_json,
-            sample_phrases=sample_phrases,
-            current_position=json.dumps(current_position or {"x": 0, "y": 0, "z": 0}),
-            previous_position=json.dumps(previous_position or {"x": 0, "y": 0, "z": 0}),
-            gripper_state=gripper_state,
-            utterance=utterance
-        )
-        
-        if VERBOSE_LOGGING:
-            print(f"[LLMInterpreter] Querying Claude for: '{utterance}'")
-        
         try:
+            prompt = self._build_prompt(voice_command)
+
+            # Use Claude with minimal settings for speed and cost
             response = self.client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=500,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}]
+                model=self.model,
+                max_tokens=300,  # Slightly more for intent JSON
+                temperature=0,   # Deterministic for consistency
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
             )
-            
-            # Parse response
+
+            # Extract the JSON response
             response_text = response.content[0].text.strip()
-            
-            # Try to extract JSON (in case there's any wrapper text)
-            json_match = response_text
-            if not response_text.startswith('{'):
-                import re
-                match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if match:
-                    json_match = match.group()
-            
-            result = json.loads(json_match)
-            
-            # Add needs_confirmation based on confidence
-            result["needs_confirmation"] = result.get("confidence", 0) < LLM_CONFIDENCE_THRESHOLD
-            
-            if VERBOSE_LOGGING:
-                print(f"[LLMInterpreter] Result: {result['intent']} (confidence: {result.get('confidence', 0):.2f})")
-                if result.get("explanation"):
-                    print(f"[LLMInterpreter] Explanation: {result['explanation']}")
-            
+
+            # Handle markdown code blocks
+            if response_text.startswith("```"):
+                lines = response_text.split("\n")
+                json_lines = [l for l in lines if l and not l.startswith("```")]
+                response_text = "\n".join(json_lines)
+
+            result = json.loads(response_text)
+
+            # Validate structure
+            if not all(k in result for k in ["intent", "params", "confidence"]):
+                print(f"Warning: Invalid LLM response structure: {result}")
+                return None
+
+            # Validate confidence
+            if not (0.0 <= result["confidence"] <= 1.0):
+                print(f"Warning: Invalid confidence value: {result['confidence']}")
+                result["confidence"] = 0.5  # Default to low confidence
+
             return result
-            
+
         except json.JSONDecodeError as e:
-            print(f"[LLMInterpreter] Failed to parse response as JSON: {e}")
-            print(f"[LLMInterpreter] Raw response: {response_text[:200]}")
-            return {
-                "understood": False,
-                "intent": None,
-                "parameters": {},
-                "confidence": 0.0,
-                "phrase_to_save": None,
-                "explanation": f"Failed to parse LLM response: {e}",
-                "needs_confirmation": False
-            }
-            
-        except anthropic.APIError as e:
-            print(f"[LLMInterpreter] API error: {e}")
-            return {
-                "understood": False,
-                "intent": None,
-                "parameters": {},
-                "confidence": 0.0,
-                "phrase_to_save": None,
-                "explanation": f"API error: {e}",
-                "needs_confirmation": False
-            }
-        
+            print(f"LLM JSON parsing error: {e}")
+            print(f"Response was: {response_text}")
+            return None
         except Exception as e:
-            print(f"[LLMInterpreter] Unexpected error: {e}")
-            return {
-                "understood": False,
-                "intent": None,
-                "parameters": {},
-                "confidence": 0.0,
-                "phrase_to_save": None,
-                "explanation": f"Unexpected error: {e}",
-                "needs_confirmation": False
-            }
+            print(f"LLM interpretation error: {e}")
+            return None
+
+    def is_confident(self, interpretation: Dict) -> bool:
+        """Check if LLM interpretation meets confidence threshold."""
+        return interpretation.get("confidence", 0.0) >= LLM_CONFIDENCE_THRESHOLD
 
 
-# Singleton instance
-_llm_interpreter_instance = None
+def test_llm_interpreter():
+    """Test the LLM interpreter with various commands."""
+    if not ANTHROPIC_AVAILABLE:
+        print("Cannot test: Anthropic SDK not installed")
+        return
 
-def get_llm_interpreter() -> LLMInterpreter:
-    """Get the singleton LLMInterpreter instance."""
-    global _llm_interpreter_instance
-    if _llm_interpreter_instance is None:
-        _llm_interpreter_instance = LLMInterpreter()
-    return _llm_interpreter_instance
+    if not ANTHROPIC_API_KEY:
+        print("Cannot test: ANTHROPIC_API_KEY not set")
+        return
+
+    interpreter = LLMInterpreter()
+
+    test_commands = [
+        "move right 5 centimeters",
+        "go back to where it was",
+        "go home",
+        "stop",
+        "open gripper",
+        "save this as pickup position"
+    ]
+
+    print("\n=== LLM Intent Interpreter Test ===\n")
+
+    for cmd in test_commands:
+        print(f"Command: '{cmd}'")
+        result = interpreter.interpret_command(cmd)
+        if result:
+            print(f"Intent: {result['intent']}")
+            print(f"Params: {result['params']}")
+            print(f"Confidence: {result['confidence']:.2f}")
+            print(f"Confident enough to learn: {interpreter.is_confident(result)}")
+        else:
+            print("Result: Failed to parse")
+        print()
+
+
+if __name__ == "__main__":
+    test_llm_interpreter()

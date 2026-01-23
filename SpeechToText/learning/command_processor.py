@@ -1,335 +1,210 @@
 """
-Command Processor - The main entry point that orchestrates phrase bank, LLM, and executor.
+Command Processor - Orchestrates the learning system flow.
+Phrase Bank (instant) → Fuzzy Match → LLM (fallback) → Execute + Learn
 """
+import time
+from typing import Dict, Optional
 
-from typing import Optional, Dict, Any, Tuple
-
-from .config import (
-    ENABLE_LLM_FALLBACK,
-    SILENT_LEARNING,
-    VERBOSE_LOGGING,
-    CLU_CONFIDENCE_THRESHOLD
-)
-from .phrase_bank import get_phrase_bank, PhraseBank
-from .llm_interpreter import get_llm_interpreter, LLMInterpreter
-from .intent_executor import get_executor, IntentExecutor
+from .phrase_bank import PhraseBank
+from .llm_interpreter import LLMInterpreter
+from .config import LLM_CONFIDENCE_THRESHOLD
 
 
 class CommandProcessor:
     """
-    Main processor that handles the full flow:
-    1. Phrase bank lookup (instant)
-    2. LLM interpretation if needed (slower)
-    3. Learning new phrases
-    4. Executing commands
+    Orchestrates the three-tier command interpretation system:
+    1. Exact phrase bank match (instant)
+    2. Fuzzy phrase bank match (instant, if confident)
+    3. LLM interpretation (1-2s, learns new phrases)
     """
-    
-    def __init__(self):
-        self.phrase_bank: PhraseBank = get_phrase_bank()
-        self.llm: LLMInterpreter = get_llm_interpreter()
-        self.executor: IntentExecutor = get_executor()
-        
-        # Pending confirmation (for low-confidence matches)
-        self.pending_confirmation: Optional[Dict[str, Any]] = None
-    
-    def process(self, utterance: str, clu_result: dict = None) -> Dict[str, Any]:
+
+    def __init__(self, intent_executor, enable_llm=True):
         """
-        Process an utterance and return the result.
-        
+        Initialize command processor.
+
         Args:
-            utterance: The speech-to-text result
-            clu_result: Optional CLU result (if you want to use it)
-        
-        Returns:
-            {
-                "success": bool,
-                "intent": str or None,
-                "command": dict or None,
-                "message": str,
-                "learned": bool,
-                "needs_confirmation": bool,
-                "confirmation_prompt": str or None
-            }
+            intent_executor: IntentExecutor instance for executing commands
+            enable_llm: Whether to use LLM fallback (disable for testing)
         """
-        utterance = utterance.strip()
-        if not utterance:
-            return self._result(False, message="Empty utterance")
-        
-        # Check for confirmation response
-        if self.pending_confirmation:
-            return self._handle_confirmation(utterance)
-        
-        if VERBOSE_LOGGING:
-            print(f"\n[CommandProcessor] Processing: '{utterance}'")
-        
-        # Step 1: Try phrase bank lookup
-        match, confidence, needs_confirm = self.phrase_bank.lookup(utterance)
-        
-        if match and not needs_confirm:
-            # Good match - execute directly
-            intent = match["intent"]
-            parameters = match.get("parameters", {})
-            
-            if VERBOSE_LOGGING:
-                print(f"[CommandProcessor] Phrase bank match: {intent} (confidence: {confidence:.2f})")
-            
-            command = self.executor.execute(intent, parameters)
-            return self._result(
-                success=True,
-                intent=intent,
-                command=command,
-                message=f"Executing: {intent}",
-                source="phrase_bank"
-            )
-        
-        if match and needs_confirm:
-            # Low confidence match - ask for confirmation
-            self.pending_confirmation = {
-                "original_utterance": utterance,
-                "suggested_intent": match["intent"],
-                "suggested_parameters": match.get("parameters", {}),
-                "confidence": confidence
-            }
-            
-            intent_info = self.phrase_bank.get_intent_info(match["intent"])
-            intent_desc = intent_info.get("description", match["intent"]) if intent_info else match["intent"]
-            
-            return self._result(
-                success=False,
-                needs_confirmation=True,
-                confirmation_prompt=f"Did you mean '{intent_desc}'? Say 'yes' or 'no'.",
-                message=f"Low confidence match ({confidence:.0%}), asking for confirmation"
-            )
-        
-        # Step 2: Try CLU if provided and confident
-        if clu_result and self._is_clu_confident(clu_result):
-            intent, params = self._extract_clu_intent(clu_result)
-            if intent:
-                if VERBOSE_LOGGING:
-                    print(f"[CommandProcessor] CLU match: {intent}")
-                
-                command = self.executor.execute(intent, params)
-                return self._result(
-                    success=True,
-                    intent=intent,
-                    command=command,
-                    message=f"Executing from CLU: {intent}",
-                    source="clu"
-                )
-        
-        # Step 3: Fall back to LLM
-        if ENABLE_LLM_FALLBACK:
-            return self._try_llm_interpretation(utterance)
-        
-        # No match anywhere
-        return self._result(
-            success=False,
-            message=f"I don't understand '{utterance}'. Try rephrasing or say something like 'move right 5 centimeters'."
-        )
-    
-    def _try_llm_interpretation(self, utterance: str) -> Dict[str, Any]:
-        """Use LLM to interpret an unknown utterance."""
-        if VERBOSE_LOGGING:
-            print("[CommandProcessor] Falling back to LLM interpretation...")
-        
-        state = self.executor.get_state()
-        
-        llm_result = self.llm.interpret(
-            utterance=utterance,
-            current_position=state["current_position"],
-            previous_position=state["previous_position"],
-            gripper_state=state["gripper_state"]
-        )
-        
-        if not llm_result.get("understood"):
-            explanation = llm_result.get("explanation", "Could not understand the command")
-            return self._result(
-                success=False,
-                message=f"I couldn't understand that. {explanation}"
-            )
-        
-        intent = llm_result.get("intent")
-        parameters = llm_result.get("parameters", {})
-        confidence = llm_result.get("confidence", 0)
-        phrase_to_save = llm_result.get("phrase_to_save")
-        needs_confirm = llm_result.get("needs_confirmation", False)
-        
-        if needs_confirm and not SILENT_LEARNING:
-            # Low confidence - ask for confirmation
-            self.pending_confirmation = {
-                "original_utterance": utterance,
-                "suggested_intent": intent,
-                "suggested_parameters": parameters,
-                "phrase_to_save": phrase_to_save,
-                "confidence": confidence,
-                "from_llm": True
-            }
-            
-            intent_info = self.phrase_bank.get_intent_info(intent)
-            intent_desc = intent_info.get("description", intent) if intent_info else intent
-            
-            return self._result(
-                success=False,
-                needs_confirmation=True,
-                confirmation_prompt=f"I think you want to '{intent_desc}'. Is that right?",
-                message=f"LLM interpretation ({confidence:.0%}), asking for confirmation"
-            )
-        
-        # Confident enough - execute and learn
-        command = self.executor.execute(intent, parameters)
-        
-        # Learn the phrase if provided
-        learned = False
-        if phrase_to_save and intent:
-            learned = self.phrase_bank.add_phrase(
-                phrase=phrase_to_save,
-                intent=intent,
-                parameters=parameters,
-                source="llm_learned"
-            )
-        
-        return self._result(
-            success=True,
-            intent=intent,
-            command=command,
-            message=f"Executing: {intent}" + (" (learned)" if learned else ""),
-            learned=learned,
-            source="llm"
-        )
-    
-    def _handle_confirmation(self, response: str) -> Dict[str, Any]:
-        """Handle a yes/no confirmation response."""
-        response_lower = response.lower().strip()
-        pending = self.pending_confirmation
-        self.pending_confirmation = None  # Clear pending state
-        
-        is_yes = response_lower in ["yes", "yeah", "yep", "correct", "right", "sure", "ok", "okay", "affirmative"]
-        is_no = response_lower in ["no", "nope", "wrong", "incorrect", "cancel", "nevermind"]
-        
-        if is_yes:
-            intent = pending["suggested_intent"]
-            parameters = pending["suggested_parameters"]
-            
-            command = self.executor.execute(intent, parameters)
-            
-            # Learn the phrase
-            learned = False
-            phrase_to_save = pending.get("phrase_to_save") or pending.get("original_utterance")
-            if phrase_to_save:
-                learned = self.phrase_bank.add_phrase(
-                    phrase=phrase_to_save,
-                    intent=intent,
-                    parameters=parameters,
-                    source="confirmed_learned"
-                )
-            
-            return self._result(
-                success=True,
-                intent=intent,
-                command=command,
-                message=f"Confirmed and executing: {intent}" + (" (learned)" if learned else ""),
-                learned=learned
-            )
-        
-        elif is_no:
-            return self._result(
-                success=False,
-                message="Okay, cancelled. Please try rephrasing your command."
-            )
-        
-        else:
-            # Didn't understand confirmation response - restore pending state
-            self.pending_confirmation = pending
-            return self._result(
-                success=False,
-                needs_confirmation=True,
-                confirmation_prompt="Please say 'yes' or 'no'.",
-                message="Didn't understand confirmation response"
-            )
-    
-    def _is_clu_confident(self, clu_result: dict) -> bool:
-        """Check if CLU result is confident enough to use."""
-        try:
-            prediction = clu_result.get("result", {}).get("prediction", {})
-            top_intent = prediction.get("topIntent")
-            intents = prediction.get("intents", [])
-            
-            for intent in intents:
-                if intent.get("category") == top_intent:
-                    confidence = intent.get("confidenceScore", 0)
-                    return confidence >= CLU_CONFIDENCE_THRESHOLD
-            
-            return False
-        except Exception:
-            return False
-    
-    def _extract_clu_intent(self, clu_result: dict) -> Tuple[Optional[str], dict]:
-        """Extract intent and parameters from CLU result."""
-        try:
-            prediction = clu_result.get("result", {}).get("prediction", {})
-            intent = prediction.get("topIntent")
-            entities = prediction.get("entities", [])
-            
-            # Map CLU intents to our intents (adjust based on your CLU model)
-            intent_map = {
-                "MoveDirection": "move_relative",
-                "MoveToLocation": "move_to_named",
-                "GoBack": "move_to_previous",
-                "Grab": "gripper_close",
-                "Release": "gripper_open",
-                "Stop": "emergency_stop",
-            }
-            
-            mapped_intent = intent_map.get(intent, intent)
-            
-            # Extract parameters from entities
-            params = {}
-            for entity in entities:
-                category = entity.get("category", "")
-                text = entity.get("text", "")
-                
-                if category == "Direction":
-                    params["direction"] = text.lower()
-                elif category == "Distance":
-                    try:
-                        params["distance"] = float(text)
-                    except ValueError:
-                        pass
-                elif category == "Location":
-                    params["location_name"] = text.lower()
-            
-            return mapped_intent, params
-            
-        except Exception as e:
-            print(f"[CommandProcessor] Error extracting CLU intent: {e}")
-            return None, {}
-    
-    def _result(self, success: bool, intent: str = None, command: dict = None,
-                message: str = "", learned: bool = False, needs_confirmation: bool = False,
-                confirmation_prompt: str = None, source: str = None) -> Dict[str, Any]:
-        """Build a result dict."""
-        return {
-            "success": success,
-            "intent": intent,
-            "command": command,
-            "message": message,
-            "learned": learned,
-            "needs_confirmation": needs_confirmation,
-            "confirmation_prompt": confirmation_prompt,
-            "source": source
+        self.executor = intent_executor
+        self.phrase_bank = PhraseBank(auto_save=True)
+        self.enable_llm = enable_llm
+
+        self.llm_interpreter = None
+        if enable_llm:
+            try:
+                self.llm_interpreter = LLMInterpreter()
+                print("✓ LLM fallback enabled")
+            except Exception as e:
+                print(f"⚠️  LLM fallback disabled: {e}")
+                self.enable_llm = False
+
+        # Statistics
+        self.stats = {
+            "total_commands": 0,
+            "exact_matches": 0,
+            "fuzzy_matches": 0,
+            "llm_interpretations": 0,
+            "phrases_learned": 0,
+            "failed_parses": 0
         }
-    
-    def get_state(self) -> dict:
-        """Get current system state."""
-        return self.executor.get_state()
+
+    def process_command(self, voice_command: str) -> bool:
+        """
+        Process a voice command through the three-tier system.
+
+        Args:
+            voice_command: Natural language command from speech recognition
+
+        Returns:
+            True if command was successfully executed, False otherwise
+        """
+        self.stats["total_commands"] += 1
+
+        print(f"\n🎤 Processing: '{voice_command}'")
+
+        # Tier 1: Exact match
+        result = self.phrase_bank.exact_match(voice_command)
+        if result:
+            print(f"✓ Exact match → {result['intent']}")
+            self.stats["exact_matches"] += 1
+            return self._execute_intent(result)
+
+        # Tier 2: Fuzzy match
+        fuzzy_result = self.phrase_bank.fuzzy_match(voice_command)
+        if fuzzy_result:
+            matched_phrase, result, confidence = fuzzy_result
+            print(f"✓ Fuzzy match ({confidence:.2f}) → {result['intent']}")
+            print(f"  Matched: '{matched_phrase}'")
+            self.stats["fuzzy_matches"] += 1
+            return self._execute_intent(result)
+
+        # Tier 3: LLM interpretation
+        if not self.enable_llm or not self.llm_interpreter:
+            print("✗ No match and LLM disabled")
+            self.stats["failed_parses"] += 1
+            return False
+
+        print("🤖 Querying LLM...")
+        start_time = time.time()
+
+        llm_result = self.llm_interpreter.interpret_command(voice_command)
+        elapsed = time.time() - start_time
+
+        if not llm_result:
+            print(f"✗ LLM failed to interpret ({elapsed:.2f}s)")
+            self.stats["failed_parses"] += 1
+            return False
+
+        print(f"✓ LLM interpreted ({elapsed:.2f}s) → {llm_result['intent']}")
+        print(f"  Confidence: {llm_result['confidence']:.2f}")
+        self.stats["llm_interpretations"] += 1
+
+        # Execute the command
+        success = self._execute_intent(llm_result)
+
+        # Learn if confident and successful
+        if success and self.llm_interpreter.is_confident(llm_result):
+            self._learn_phrase(voice_command, llm_result)
+
+        return success
+
+    def _execute_intent(self, result: Dict) -> bool:
+        """Execute an intent result."""
+        intent = result["intent"]
+        params = result["params"]
+
+        return self.executor.execute_intent(intent, params)
+
+    def _learn_phrase(self, phrase: str, llm_result: Dict):
+        """Add a new phrase to the phrase bank."""
+        self.phrase_bank.add_phrase(
+            phrase=phrase,
+            intent=llm_result["intent"],
+            params=llm_result["params"],
+            confidence=llm_result["confidence"]
+        )
+        self.stats["phrases_learned"] += 1
+
+        print(f"📚 Learned new phrase (total learned: {self.stats['phrases_learned']})")
+
+    def get_stats(self) -> Dict:
+        """Get processing statistics."""
+        stats = self.stats.copy()
+
+        # Add derived metrics
+        if stats["total_commands"] > 0:
+            stats["exact_match_rate"] = stats["exact_matches"] / stats["total_commands"]
+            stats["fuzzy_match_rate"] = stats["fuzzy_matches"] / stats["total_commands"]
+            stats["llm_usage_rate"] = stats["llm_interpretations"] / stats["total_commands"]
+            stats["success_rate"] = 1.0 - (stats["failed_parses"] / stats["total_commands"])
+
+        # Add phrase bank stats
+        stats["phrase_bank"] = self.phrase_bank.get_stats()
+
+        return stats
+
+    def print_stats(self):
+        """Print processing statistics."""
+        stats = self.get_stats()
+
+        print("\n" + "="*60)
+        print("COMMAND PROCESSING STATISTICS")
+        print("="*60)
+
+        print(f"\nTotal Commands: {stats['total_commands']}")
+        print(f"  Exact Matches: {stats['exact_matches']} ({stats.get('exact_match_rate', 0)*100:.1f}%)")
+        print(f"  Fuzzy Matches: {stats['fuzzy_matches']} ({stats.get('fuzzy_match_rate', 0)*100:.1f}%)")
+        print(f"  LLM Calls: {stats['llm_interpretations']} ({stats.get('llm_usage_rate', 0)*100:.1f}%)")
+        print(f"  Failed: {stats['failed_parses']}")
+
+        print(f"\nLearning:")
+        print(f"  Phrases Learned This Session: {stats['phrases_learned']}")
+
+        print(f"\nPhrase Bank:")
+        pb_stats = stats['phrase_bank']
+        print(f"  Total Phrases: {pb_stats['total_phrases']}")
+        print(f"  Named Locations: {pb_stats['named_locations']}")
+        if pb_stats['most_used_phrase']:
+            print(f"  Most Used: '{pb_stats['most_used_phrase']}'")
+
+        print(f"\nSuccess Rate: {stats.get('success_rate', 0)*100:.1f}%")
+        print("="*60 + "\n")
 
 
-# Singleton instance
-_processor_instance = None
+def test_command_processor():
+    """Test command processor with mock executor."""
+    print("\n=== Command Processor Test ===\n")
 
-def get_processor() -> CommandProcessor:
-    """Get the singleton CommandProcessor instance."""
-    global _processor_instance
-    if _processor_instance is None:
-        _processor_instance = CommandProcessor()
-    return _processor_instance
+    # Mock executor
+    class MockExecutor:
+        def __init__(self):
+            self.current_position = {"x": 0.0, "y": 0.0, "z": 0.0}
+
+        def execute_intent(self, intent, params):
+            print(f"  [MockExecutor] Executing {intent} with {params}")
+            return True
+
+        def get_position(self):
+            return self.current_position.copy()
+
+    executor = MockExecutor()
+    processor = CommandProcessor(executor, enable_llm=False)  # Disable LLM for quick test
+
+    # Test commands
+    test_commands = [
+        "go back",  # Should hit exact match
+        "go bak",   # Should hit fuzzy match
+        "move right 5 centimeters",  # Should hit exact match
+        "stop",  # Should hit exact match
+    ]
+
+    for cmd in test_commands:
+        processor.process_command(cmd)
+
+    # Print stats
+    processor.print_stats()
+
+
+if __name__ == "__main__":
+    test_command_processor()
