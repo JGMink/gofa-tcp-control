@@ -1,0 +1,216 @@
+{
+  "meta": {
+    "version": 1,
+    "last_updated": "2025-01-18T00:00:00Z",
+    "description": "Robot voice command vocabulary - learned phrases map to intents"
+  },
+
+  "intents": {
+    "move_relative": {
+      "description": "Move robot by a delta in a specified direction",
+      "parameters": ["direction", "distance"],
+      "implemented": true
+    },
+    "move_to_previous": {
+      "description": "Return to the position before the current one",
+      "parameters": [],
+      "implemented": true
+    },
+    "move_to_named": {
+      "description": "Move to a named/saved location",
+      "parameters": ["location_name"],
+      "implemented": true
+    },
+    "save_named_location": {
+      "description": "Save current position with a name for later use",
+      "parameters": ["location_name"],
+      "implemented": false,
+      "not_implemented_message": "I don't know how to save locations yet, but I'll remember this phrase for when I can."
+    },
+    "gripper_open": {
+      "description": "Open the gripper to release an object",
+      "parameters": [],
+      "implemented": false,
+      "not_implemented_message": "Gripper control isn't set up yet, but I'll remember this for later."
+    },
+    "gripper_close": {
+      "description": "Close the gripper to grab an object",
+      "parameters": [],
+      "implemented": false,
+      "not_implemented_message": "Gripper control isn't set up yet, but I'll remember this for later."
+    },
+    "emergency_stop": {
+      "description": "Immediately halt all robot movement",
+      "parameters": [],
+      "implemented": true
+    },
+    "resume": {
+      "description": "Resume operation after an emergency stop",
+      "parameters": [],
+      "implemented": false,
+      "not_implemented_message": "Resume functionality isn't implemented yet."
+    }
+  },
+
+  "phrases": {
+    "move right": {
+      "intent": "move_relative",
+      "parameters": {"direction": "right"},
+      "source": "hardcoded"
+    },
+    "move left": {
+      "intent": "move_relative",
+      "parameters": {"direction": "left"},
+      "source": "hardcoded"
+    },
+    "move up": {
+      "intent": "move_relative",
+      "parameters": {"direction": "up"},
+      "source": "hardcoded"
+    },
+    "move down": {
+      "intent": "move_relative",
+      "parameters": {"direction": "down"},
+      "source": "hardcoded"
+    },
+    "move forward": {
+      "intent": "move_relative",
+      "parameters": {"direction": "forward"},
+      "source": "hardcoded"
+    },
+    "move backward": {
+      "intent": "move_relative",
+      "parameters": {"direction": "backward"},
+      "source": "hardcoded"
+    },
+    "go right": {
+      "intent": "move_relative",
+      "parameters": {"direction": "right"},
+      "source": "hardcoded"
+    },
+    "go left": {
+      "intent": "move_relative",
+      "parameters": {"direction": "left"},
+      "source": "hardcoded"
+    },
+    "go up": {
+      "intent": "move_relative",
+      "parameters": {"direction": "up"},
+      "source": "hardcoded"
+    },
+    "go down": {
+      "intent": "move_relative",
+      "parameters": {"direction": "down"},
+      "source": "hardcoded"
+    },
+    "go forward": {
+      "intent": "move_relative",
+      "parameters": {"direction": "forward"},
+      "source": "hardcoded"
+    },
+    "go backward": {
+      "intent": "move_relative",
+      "parameters": {"direction": "backward"},
+      "source": "hardcoded"
+    },
+    "go back": {
+      "intent": "move_to_previous",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "move back": {
+      "intent": "move_to_previous",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "return to previous position": {
+      "intent": "move_to_previous",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "go to previous position": {
+      "intent": "move_to_previous",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "grab": {
+      "intent": "gripper_close",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "grab it": {
+      "intent": "gripper_close",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "pick up": {
+      "intent": "gripper_close",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "pick it up": {
+      "intent": "gripper_close",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "release": {
+      "intent": "gripper_open",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "let go": {
+      "intent": "gripper_open",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "drop it": {
+      "intent": "gripper_open",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "put it down": {
+      "intent": "gripper_open",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "stop": {
+      "intent": "emergency_stop",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "halt": {
+      "intent": "emergency_stop",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "emergency": {
+      "intent": "emergency_stop",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "freeze": {
+      "intent": "emergency_stop",
+      "parameters": {},
+      "source": "hardcoded"
+    },
+    "go home": {
+      "intent": "move_to_named",
+      "parameters": {"location_name": "home"},
+      "source": "hardcoded"
+    },
+    "move to home": {
+      "intent": "move_to_named",
+      "parameters": {"location_name": "home"},
+      "source": "hardcoded"
+    },
+    "return home": {
+      "intent": "move_to_named",
+      "parameters": {"location_name": "home"},
+      "source": "hardcoded"
+    }
+  },
+
+  "locations": {
+    "home": {"x": 0.0, "y": 0.567, "z": -0.24}
+  }
+}
