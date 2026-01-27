@@ -18,9 +18,42 @@ public class TCPHotController : MonoBehaviour
         // Build path relative to project root
         string projectRoot = Directory.GetParent(Application.dataPath).FullName;
         fullPath = Path.Combine(projectRoot, configPath);
-        
+
         Debug.Log($"Watching: {fullPath}");
+
+        // Write current position to file on startup
+        WriteCurrentPosition();
+
         StartCoroutine(WatchFile());
+    }
+
+    void OnApplicationQuit()
+    {
+        // Write current position to file on shutdown
+        WriteCurrentPosition();
+        Debug.Log("Saved TCP position on shutdown");
+    }
+
+    void WriteCurrentPosition()
+    {
+        try
+        {
+            TCPCommand cmd = new TCPCommand
+            {
+                x = transform.position.x,
+                y = transform.position.y,
+                z = transform.position.z
+            };
+
+            string json = JsonUtility.ToJson(cmd, true);
+            File.WriteAllText(fullPath, json);
+
+            Debug.Log($"Wrote current position to file: ({cmd.x:F3}, {cmd.y:F3}, {cmd.z:F3})");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Failed to write current position: {e.Message}");
+        }
     }
     
     IEnumerator WatchFile()
@@ -91,15 +124,43 @@ public class TCPHotController : MonoBehaviour
         while (Vector3.Distance(transform.position, target) > 0.01f)
         {
             transform.position = Vector3.MoveTowards(
-                transform.position, 
-                target, 
+                transform.position,
+                target,
                 moveSpeed * Time.deltaTime
             );
             yield return null;
         }
-        
+
         transform.position = target;
         Debug.Log("TCP reached target");
+
+        // Write acknowledgment for queue system
+        WriteAcknowledgment(target);
+    }
+
+    void WriteAcknowledgment(Vector3 position)
+    {
+        try
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string ackPath = Path.Combine(projectRoot, "tcp_ack.json");
+
+            TCPAck ack = new TCPAck
+            {
+                completed = true,
+                position = new TCPCommand { x = position.x, y = position.y, z = position.z },
+                timestamp = System.DateTime.Now.ToString("o")
+            };
+
+            string ackJson = JsonUtility.ToJson(ack, true);
+            File.WriteAllText(ackPath, ackJson);
+
+            Debug.Log($"Acknowledgment written: ({position.x:F3}, {position.y:F3}, {position.z:F3})");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Failed to write acknowledgment: {e.Message}");
+        }
     }
 }
 
@@ -110,3 +171,12 @@ public class TCPCommand
     public float y;
     public float z;
 }
+
+[System.Serializable]
+public class TCPAck
+{
+    public bool completed;
+    public TCPCommand position;
+    public string timestamp;
+}
+
