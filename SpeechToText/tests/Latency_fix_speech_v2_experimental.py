@@ -16,6 +16,17 @@ import os
 from collections import deque
 from datetime import datetime
 
+# Global start time for relative timestamps
+_start_time = None
+
+def get_timestamp():
+    """Get a relative timestamp in seconds since program start."""
+    global _start_time
+    if _start_time is None:
+        _start_time = time.time()
+    elapsed = time.time() - _start_time
+    return f"[{elapsed:7.3f}s]"
+
 import numpy as np
 import sounddevice as sde
 import webrtcvad
@@ -59,7 +70,11 @@ PRE_SPEECH_FRAMES = 10
 SILENCE_TIMEOUT_SECS = 0.6
 
 # Partial recognition debounce (wait for more text before executing)
-PARTIAL_DEBOUNCE_SECS = 0.3  # Wait 300ms to see if more text arrives
+# Increased to 500ms to give more time for "and" to be recognized
+PARTIAL_DEBOUNCE_SECS = 0.5  # Wait 500ms to see if more text arrives
+
+# Timeout for "and" commands - if we've been waiting this long, execute anyway
+AND_COMMAND_TIMEOUT_SECS = 2.0  # Don't wait more than 2s for final recognition
 
 # Phrase list
 PHRASE_LIST = [
@@ -288,7 +303,7 @@ def add_positions_to_queue(positions: list):
             current_position = positions[-1]["position"].copy()
         
         save_command_queue()
-        print(f"✅ Added {len(positions)} command(s) | Queue total: {len(command_queue)}")
+        print(f"{get_timestamp()} ✅ Added {len(positions)} command(s) | Queue total: {len(command_queue)}")
 
 
 def save_command_queue():
@@ -303,7 +318,7 @@ def save_command_queue():
             
             if latest_move:
                 json.dump(latest_move, f, indent=2)
-                print(f"   📤 Written to JSON: {latest_move}")
+                print(f"{get_timestamp()}    📤 Written to JSON: {latest_move}")
             else:
                 json.dump({}, f)
         else:
@@ -375,6 +390,7 @@ class MicToAzureStream:
         self.last_partial_text = ""
         self.last_partial_time = 0  # Track when last partial text arrived
         self.pending_partial_timer = None  # Timer for debounced execution
+        self.pending_and_timer = None  # Timer for "and" command timeout
         self.executed_in_partial = ""  # Track what we already executed during partial
         self.partial_lock = threading.Lock()  # Protect shared state
 
@@ -441,17 +457,41 @@ class MicToAzureStream:
         except Exception:
             pass
 
+    def _execute_and_timeout(self, captured_text):
+        """Execute an 'and' command after timeout - we waited long enough for final."""
+        with self.partial_lock:
+            # Don't execute if we already executed something
+            if self.executed_in_partial:
+                return
+
+            # Don't execute empty text
+            if not captured_text or len(captured_text.strip()) < 3:
+                return
+
+            print()
+            print(f"{get_timestamp()} ⏱️ AND TIMEOUT: Executing after {AND_COMMAND_TIMEOUT_SECS}s wait")
+            print(f"{get_timestamp()} ⚡ EXEC (timeout): '{captured_text}'")
+
+            positions = process_multi_command_sentence(captured_text)
+            if positions:
+                add_positions_to_queue(positions)
+                print(f"{get_timestamp()} ➜ Robot executing (and-timeout)!\n")
+                self.executed_in_partial = captured_text
+
     def _execute_partial_command(self, captured_text):
         """Execute a partial command after debounce delay."""
         with self.partial_lock:
-            # Double-check: don't execute if text NOW contains "and" or "then"
-            # (in case it was added after timer started)
-            current_partial = self.last_partial_text
-            if ' and ' in current_partial.lower() or ' then ' in current_partial.lower():
+            # Double-check: don't execute if text NOW contains connectors
+            # (in case "and"/"then" was added after timer started)
+            current_partial = self.last_partial_text.lower()
+            has_connector_current = ' and ' in current_partial or ' then ' in current_partial
+            if has_connector_current:
                 return
 
             # Also check the captured text we're about to execute
-            if ' and ' in captured_text.lower() or ' then ' in captured_text.lower():
+            captured_lower = captured_text.lower()
+            has_connector_captured = ' and ' in captured_lower or ' then ' in captured_lower
+            if has_connector_captured:
                 return
 
             # Only execute if this text hasn't been executed yet
@@ -466,8 +506,9 @@ class MicToAzureStream:
             positions = process_multi_command_sentence(captured_text)
             if positions:
                 print()  # New line after partial text
+                print(f"{get_timestamp()} ⚡ EXEC PARTIAL: '{captured_text}'")
                 add_positions_to_queue(positions)
-                print(f"➜ Robot executing partial command!\n")
+                print(f"{get_timestamp()} ➜ Robot executing partial command!\n")
                 # Track what we executed
                 self.executed_in_partial = captured_text
 
@@ -477,7 +518,7 @@ class MicToAzureStream:
 
         # Display full transcription in real-time
         if len(text) > 0:
-            print(f"\r[Partial] {text}", end='', flush=True)
+            print(f"\r{get_timestamp()} [Partial] {text}", end='', flush=True)
 
         # Check for emergency words FIRST
         if check_for_emergency_words(text):
@@ -492,15 +533,44 @@ class MicToAzureStream:
 
             # Skip partial processing if text contains "and" or "then" - wait for final
             # This prevents partial execution of combined commands
-            if ' and ' in text.lower() or ' then ' in text.lower():
+            # Note: "and" = combine into diagonal, "then" = sequential separate movements
+            text_lower_check = text.lower()
+            has_connector = ' and ' in text_lower_check or ' then ' in text_lower_check
+
+            if has_connector:
                 self.last_partial_text = text
+
+                # Start a timeout timer - if final doesn't arrive in time, execute anyway
+                if self.pending_and_timer:
+                    self.pending_and_timer.cancel()
+                self.pending_and_timer = threading.Timer(
+                    AND_COMMAND_TIMEOUT_SECS,
+                    self._execute_and_timeout,
+                    args=[text]
+                )
+                self.pending_and_timer.start()
                 return
 
             # Skip if text ends with incomplete words that suggest more is coming
             text_lower = text.lower().strip()
-            incomplete_endings = [' and', ' then', ' to', ' the', ' a', ' move', ' go']
+            incomplete_endings = [' and', ' then', ' and then', ' to', ' the', ' a', ' move', ' go']
             for ending in incomplete_endings:
                 if text_lower.endswith(ending):
+                    self.last_partial_text = text
+                    return
+
+            # IMPORTANT: Skip partial execution if phrase ends with a direction word
+            # These commonly precede "and" (e.g., "move right and up")
+            # We want to wait for the full phrase to preserve combining behavior
+            direction_words = ['right', 'left', 'up', 'down', 'forward', 'forwards',
+                              'backward', 'backwards', 'back', 'upward', 'upwards',
+                              'downward', 'downwards']
+            words = text_lower.split()
+            if words and words[-1] in direction_words:
+                # Check if this is a short phrase that likely has more coming
+                # e.g., "move right" (2 words) vs "move to the right please" (5 words)
+                if len(words) <= 4:
+                    # Don't execute yet - wait for potential "and X"
                     self.last_partial_text = text
                     return
 
@@ -522,13 +592,16 @@ class MicToAzureStream:
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
             text = evt.result.text
             timestamp = time.time()
-            print(f"\n\n✓ [FINAL] {text}")
+            print(f"\n\n{get_timestamp()} ✓ [FINAL] {text}")
 
             with self.partial_lock:
-                # Cancel any pending partial execution - we have final text now
+                # Cancel any pending timers - we have final text now
                 if self.pending_partial_timer:
                     self.pending_partial_timer.cancel()
                     self.pending_partial_timer = None
+                if self.pending_and_timer:
+                    self.pending_and_timer.cancel()
+                    self.pending_and_timer = None
 
                 # Double-check for emergency words
                 if check_for_emergency_words(text):
@@ -546,34 +619,53 @@ class MicToAzureStream:
                     if final_text == executed_clean or final_text.startswith(executed_clean):
                         # Check if there's genuinely new content after what we executed
                         remaining = final_text[len(executed_clean):].strip()
+
+                        # Check if this was supposed to be a combined "and" command
+                        # If so, we should NOT execute the remaining part separately
+                        # because it was meant to be combined with what partial executed
+                        was_and_command = remaining.startswith('and ')
+
                         # Remove common connectors from the beginning
                         for prefix in ['and ', 'then ', 'and to the ', 'to the ']:
                             if remaining.startswith(prefix):
                                 remaining = remaining[len(prefix):]
 
                         if remaining and len(remaining) > 2:
-                            # There's new content - process just the new part
-                            print(f"  └─ Partial already executed: '{executed}'")
-                            print(f"  └─ Processing remaining: '{remaining}'")
-                            positions = process_multi_command_sentence(remaining)
-                            if positions:
-                                add_positions_to_queue(positions)
-                                print(f"➜ Final (remaining) commands sent!\n")
+                            if was_and_command:
+                                # This was meant to be combined but partial executed early
+                                # Execute remaining as separate movement (better than nothing)
+                                # but warn about the missed combination
+                                print(f"{get_timestamp()}   └─ Partial already executed: '{executed}'")
+                                print(f"{get_timestamp()}   ⚠ Missed combination! Executing remaining separately: '{remaining}'")
+                                positions = process_multi_command_sentence(remaining)
+                                if positions:
+                                    add_positions_to_queue(positions)
+                                    print(f"{get_timestamp()} ➜ Final (remaining) commands sent!\n")
+                            else:
+                                # Sequential command ("then") - execute remaining
+                                print(f"{get_timestamp()}   └─ Partial already executed: '{executed}'")
+                                print(f"{get_timestamp()}   └─ Processing remaining: '{remaining}'")
+                                positions = process_multi_command_sentence(remaining)
+                                if positions:
+                                    add_positions_to_queue(positions)
+                                    print(f"{get_timestamp()} ➜ Final (remaining) commands sent!\n")
                         else:
-                            print(f"  └─ Skipping (already executed in partial)\n")
+                            print(f"{get_timestamp()}   └─ Skipping (already executed in partial)\n")
                     else:
                         # Final text is different - process the whole thing
                         # but this shouldn't happen often
+                        print(f"{get_timestamp()} ⚡ EXEC FINAL (different): '{text}'")
                         positions = process_multi_command_sentence(text)
                         if positions:
                             add_positions_to_queue(positions)
-                            print(f"➜ Final commands sent!\n")
+                            print(f"{get_timestamp()} ➜ Final commands sent!\n")
                 else:
                     # Nothing was executed in partial - process everything
+                    print(f"{get_timestamp()} ⚡ EXEC FINAL: '{text}'")
                     positions = process_multi_command_sentence(text)
                     if positions:
                         add_positions_to_queue(positions)
-                        print(f"➜ Final commands sent!\n")
+                        print(f"{get_timestamp()} ➜ Final commands sent!\n")
 
                 # Reset trackers for next utterance
                 self.last_partial_text = ""
