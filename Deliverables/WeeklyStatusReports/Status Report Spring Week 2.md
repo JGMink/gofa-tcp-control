@@ -14,7 +14,7 @@
 
 | **Team Member** | **Assigned Task(s)** | **Progress / Achievements This Week** |
 |------------------|----------------------|---------------------------------------|
-| **All Members** | Each person worked on their own part refining and connecting to the next step of the pipeline. |
+| **All Members** | Refine Robot Communication | Each person worked on their own part refining and connecting to the next step of the pipeline. |
 | **Joseph** | Expo scene creation and props | Continued to work and research on unity expo scene. Connected with Dr. Brixey and finalized the 3d printed props. |
 | **Jonah** | LLM and Machine learning | Continued working on the completion and integration of the Speech-to-Text and Unity action execution as well as Unity to Robot proper command translation/execution. |
 | **Thomas** | RobotStudio Improvement | Continued working on the robotstudio model and finding student rate licensing. Provided video of robot moving smoothly with virtual control. |
