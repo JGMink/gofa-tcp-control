@@ -1,0 +1,12 @@
+{"timestamp": 1769791329.1620579, "text": "Hello, move up and to the right.", "command_queue_length": 1}
+{"timestamp": 1769791335.516417, "text": "Move to the right.", "command_queue_length": 2}
+{"timestamp": 1769791341.406612, "text": "Move down and forward.", "command_queue_length": 3}
+{"timestamp": 1769791348.996141, "text": "Move backward and downwards.", "command_queue_length": 4}
+{"timestamp": 1769791358.675004, "text": "", "command_queue_length": 4}
+{"timestamp": 1769791361.975678, "text": "Move to the left.", "command_queue_length": 5}
+{"timestamp": 1769791366.044014, "text": "Move up.", "command_queue_length": 6}
+{"timestamp": 1769791370.165361, "text": "Move to the left and then move down.", "command_queue_length": 8}
+{"timestamp": 1769791374.3213701, "text": "", "command_queue_length": 8}
+{"timestamp": 1769791400.675498, "text": "Move up.", "command_queue_length": 0}
+{"timestamp": 1769791408.03824, "text": "5.", "command_queue_length": 1}
+{"timestamp": 1769791412.6136909, "text": "", "command_queue_length": 1}

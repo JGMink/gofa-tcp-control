@@ -89,7 +89,7 @@ PHRASE_LIST = [
 EMERGENCY_WORDS = ["stop", "halt", "emergency", "quit", "exit"]
 
 # Command queue file
-COMMAND_QUEUE_FILE = "../../UnityProject/tcp_commands.json"
+COMMAND_QUEUE_FILE = "../UnityProject/tcp_commands.json"
 LOG_FILE = "asr_luis_log.jsonl"
 
 import pathlib
