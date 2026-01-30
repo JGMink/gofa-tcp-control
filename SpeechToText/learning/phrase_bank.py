@@ -169,6 +169,27 @@ class PhraseBank:
 
         print(f"✓ Saved location '{name}': {position}")
 
+    def get_location(self, name: str) -> Optional[Dict]:
+        """Alias for get_named_location (for IntentExecutor compatibility)."""
+        return self.get_named_location(name)
+
+    def add_location(self, name: str, position: Dict):
+        """Alias for save_named_location (for IntentExecutor compatibility)."""
+        self.save_named_location(name, position)
+
+    def is_intent_implemented(self, intent: str) -> bool:
+        """Check if an intent is implemented (all standard intents are)."""
+        implemented_intents = [
+            "move_relative", "move_to_previous", "move_to_named",
+            "save_named_location", "gripper_open", "gripper_close",
+            "emergency_stop", "resume"
+        ]
+        return intent in implemented_intents
+
+    def get_not_implemented_message(self, intent: str) -> str:
+        """Get a user-friendly message for unimplemented intents."""
+        return f"Intent '{intent}' is not yet implemented."
+
     def get_stats(self) -> Dict:
         """Get phrase bank statistics."""
         phrases = self.data.get("phrases", {})
@@ -195,6 +216,17 @@ class PhraseBank:
             return most_used[0]
 
         return None
+
+
+# Singleton instance
+_phrase_bank_instance = None
+
+def get_phrase_bank() -> PhraseBank:
+    """Get the singleton PhraseBank instance."""
+    global _phrase_bank_instance
+    if _phrase_bank_instance is None:
+        _phrase_bank_instance = PhraseBank()
+    return _phrase_bank_instance
 
 
 def test_phrase_bank():

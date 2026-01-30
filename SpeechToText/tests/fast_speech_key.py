@@ -186,10 +186,10 @@ def parse_movement_command(text: str):
         delta["y"] = -scaled_distance
         found_direction = True
     if "forward" in text_lower or "ahead" in text_lower:
-        delta["z"] = scaled_distance
+        delta["z"] = -scaled_distance
         found_direction = True
     if "backward" in text_lower or "back" in text_lower:
-        delta["z"] = -scaled_distance
+        delta["z"] = scaled_distance
         found_direction = True
     
     if not found_direction:

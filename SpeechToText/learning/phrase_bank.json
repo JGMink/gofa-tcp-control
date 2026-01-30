@@ -1,32 +1,142 @@
 {
   "phrases": {
-    "move right 5 centimeters": {
+    "move right": {
       "intent": "move_relative",
-      "params": {"direction": "right", "distance": 5.0, "unit": "cm"},
+      "params": {
+        "direction": "right",
+        "distance": 1.0,
+        "unit": "cm"
+      },
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 7
     },
-    "go left 10 centimeters": {
+    "go right": {
       "intent": "move_relative",
-      "params": {"direction": "left", "distance": 10.0, "unit": "cm"},
+      "params": {
+        "direction": "right",
+        "distance": 1.0,
+        "unit": "cm"
+      },
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 3
     },
-    "move up": {
+    "move left": {
       "intent": "move_relative",
-      "params": {"direction": "up", "distance": 1.0, "unit": "cm"},
+      "params": {
+        "direction": "left",
+        "distance": 1.0,
+        "unit": "cm"
+      },
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 3
     },
-    "go down": {
+    "go left": {
       "intent": "move_relative",
-      "params": {"direction": "down", "distance": 1.0, "unit": "cm"},
+      "params": {
+        "direction": "left",
+        "distance": 1.0,
+        "unit": "cm"
+      },
       "confidence": 1.0,
       "usage_count": 0
     },
     "move forward": {
       "intent": "move_relative",
-      "params": {"direction": "forward", "distance": 1.0, "unit": "cm"},
+      "params": {
+        "direction": "forward",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 1
+    },
+    "go forward": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "forward",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move backward": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "backward",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "go backward": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "backward",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move right 5 centimeters": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "right",
+        "distance": 5.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 1
+    },
+    "go left 10 centimeters": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "left",
+        "distance": 10.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move up": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "up",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 5
+    },
+    "go up": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "up",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 1
+    },
+    "move down": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "down",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "go down": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "down",
+        "distance": 1.0,
+        "unit": "cm"
+      },
       "confidence": 1.0,
       "usage_count": 0
     },
@@ -34,21 +144,45 @@
       "intent": "move_to_previous",
       "params": {},
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 2
     },
     "go to previous position": {
       "intent": "move_to_previous",
       "params": {},
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 1
     },
     "return to last position": {
       "intent": "move_to_previous",
       "params": {},
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 1
     },
     "put it back where it was": {
+      "intent": "move_to_previous",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 2
+    },
+    "go back to where you were": {
+      "intent": "move_to_previous",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 3
+    },
+    "go back to where it was": {
+      "intent": "move_to_previous",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "return to where you were": {
+      "intent": "move_to_previous",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move back": {
       "intent": "move_to_previous",
       "params": {},
       "confidence": 1.0,
@@ -56,13 +190,17 @@
     },
     "go home": {
       "intent": "move_to_named",
-      "params": {"location": "home"},
+      "params": {
+        "location": "home"
+      },
       "confidence": 1.0,
       "usage_count": 0
     },
     "move to home position": {
       "intent": "move_to_named",
-      "params": {"location": "home"},
+      "params": {
+        "location": "home"
+      },
       "confidence": 1.0,
       "usage_count": 0
     },
@@ -70,13 +208,13 @@
       "intent": "emergency_stop",
       "params": {},
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 2
     },
     "halt": {
       "intent": "emergency_stop",
       "params": {},
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 2
     },
     "emergency": {
       "intent": "emergency_stop",
@@ -98,17 +236,75 @@
     },
     "save this as home": {
       "intent": "save_named_location",
-      "params": {"location": "home"},
+      "params": {
+        "location": "home"
+      },
       "confidence": 1.0,
       "usage_count": 0
+    },
+    "shift a bit to the left": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "left",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 0.95,
+      "usage_count": 1
+    },
+    "uh move a little bit": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "forward",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 0.9,
+      "usage_count": 7
+    },
+    "now go back to where you just were go back to your starting": {
+      "intent": "move_to_previous",
+      "params": {},
+      "confidence": 0.95,
+      "usage_count": 2
+    },
+    "down into left.": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "down",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 0.9,
+      "usage_count": 1
+    },
+    "ddt.": {
+      "intent": "emergency_stop",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 1
+    },
+    "players going on move right a little": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "right",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 0.9,
+      "usage_count": 2
     }
   },
   "named_locations": {
-    "home": {"x": 0.0, "y": 0.0, "z": 0.0}
+    "home": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    }
   },
   "metadata": {
     "version": "1.0",
-    "last_updated": "2026-01-22",
+    "last_updated": "2026-01-27T16:55:07.668827",
     "total_phrases_learned": 0
   }
 }

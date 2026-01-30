@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from learning.command_processor import CommandProcessor
-from intent_executor import IntentExecutor
+from learning.intent_executor import IntentExecutor
 
 
 def test_without_llm():
@@ -20,10 +20,8 @@ def test_without_llm():
     print("="*60 + "\n")
 
     # Initialize executor and processor
-    executor = IntentExecutor(
-        command_queue_file="test_commands.json",
-        initial_position={"x": 0.0, "y": 0.0, "z": 0.0}
-    )
+    executor = IntentExecutor(command_queue_file="test_commands.json")
+    executor.set_position({"x": 0.0, "y": 0.0, "z": 0.0})
     processor = CommandProcessor(executor, enable_llm=False)
 
     # Test commands (should all hit exact or fuzzy matches)
@@ -63,10 +61,8 @@ def test_with_llm():
         return
 
     # Initialize executor and processor
-    executor = IntentExecutor(
-        command_queue_file="test_commands.json",
-        initial_position={"x": 0.0, "y": 0.0, "z": 0.0}
-    )
+    executor = IntentExecutor(command_queue_file="test_commands.json")
+    executor.set_position({"x": 0.0, "y": 0.0, "z": 0.0})
     processor = CommandProcessor(executor, enable_llm=True)
 
     # Test commands (mix of known and unknown phrases)
@@ -102,10 +98,8 @@ def test_intent_executor():
     print("TEST 3: Intent Executor Direct Test")
     print("="*60 + "\n")
 
-    executor = IntentExecutor(
-        command_queue_file="test_commands.json",
-        initial_position={"x": 0.0, "y": 0.0, "z": 0.0}
-    )
+    executor = IntentExecutor(command_queue_file="test_commands.json")
+    executor.set_position({"x": 0.0, "y": 0.0, "z": 0.0})
 
     print("Testing all intent types:\n")
 
@@ -226,10 +220,8 @@ def interactive_test():
         print("Only phrase bank matching will work\n")
 
     # Initialize
-    executor = IntentExecutor(
-        command_queue_file="test_commands.json",
-        initial_position={"x": 0.0, "y": 0.0, "z": 0.0}
-    )
+    executor = IntentExecutor(command_queue_file="test_commands.json")
+    executor.set_position({"x": 0.0, "y": 0.0, "z": 0.0})
     processor = CommandProcessor(executor, enable_llm=enable_llm)
 
     print("Enter commands to test (or 'quit' to exit):")

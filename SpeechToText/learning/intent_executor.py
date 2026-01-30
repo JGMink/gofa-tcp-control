@@ -21,10 +21,11 @@ class IntentExecutor:
     Executes intents and produces robot commands.
     Maintains state like position history.
     """
-    
-    def __init__(self, command_queue_file: str = None):
+
+    def __init__(self, command_queue_file: str = None, write_to_file: bool = True):
         self.command_queue_file = command_queue_file or COMMAND_QUEUE_FILE
-        
+        self.write_to_file = write_to_file  # Whether to write to JSON (disable if main script handles it)
+
         # Position tracking
         self.current_position = {"x": 0.0, "y": 0.567, "z": -0.24}  # Starting position
         self.position_history: List[dict] = [self.current_position.copy()]
@@ -51,14 +52,22 @@ class IntentExecutor:
             "forward":  {"x": 0, "y": 0, "z": 1},
             "backward": {"x": 0, "y": 0, "z": -1},
         }
-        
-        # Initialize empty command file
-        self._save_commands()
+
+        # Don't initialize/overwrite command file on startup
+        # This preserves existing position from Unity
     
+    def execute_intent(self, intent: str, parameters: dict = None) -> bool:
+        """
+        Execute an intent (alias for CommandProcessor compatibility).
+        Returns True if successful.
+        """
+        result = self.execute(intent, parameters)
+        return result is not None and result.get("command_type") != "not_implemented"
+
     def execute(self, intent: str, parameters: dict = None) -> Optional[Dict[str, Any]]:
         """
         Execute an intent and return the command to send to the robot.
-        
+
         Returns:
             Command dict to add to queue, or None if no command needed.
         """
@@ -254,13 +263,14 @@ class IntentExecutor:
         self.current_position = new_position
     
     def _add_to_queue(self, command: dict):
-        """Add a command to the queue and save to file."""
+        """Add a command to the queue and optionally save to file."""
         command["timestamp"] = datetime.now().isoformat()
-        
+
         with self.lock:
             self.command_queue.append(command)
-        
-        self._save_commands()
+
+        if self.write_to_file:
+            self._save_commands()
     
     def _save_commands(self):
         """Save current command to the JSON file (single command mode)."""

@@ -1,11 +1,9 @@
 """
-Azure Speech-to-Text with PARTIAL RECOGNITION execution + Self-Learning System.
+Azure Speech-to-Text with PARTIAL RECOGNITION execution.
 Key features:
 - Commands execute on partial recognition (immediate response)
 - Full transcription display
 - Immediate emergency halt
-- Three-tier learning: Phrase Bank → Fuzzy Match → LLM fallback
-- Auto-learns high-confidence LLM interpretations
 """
 
 import queue
@@ -37,18 +35,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Import learning system (add parent directory to path)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Try to import CLU SDK
 try:
-    from learning.command_processor import CommandProcessor
-    from learning.intent_executor import IntentExecutor
-    from learning.phrase_bank import PhraseBank
-    LEARNING_SYSTEM_AVAILABLE = True
-    print("✓ Learning system loaded")
-except ImportError as e:
-    LEARNING_SYSTEM_AVAILABLE = False
-    print(f"⚠ Learning system not available: {e}")
-    print("  Falling back to simple command parsing")
+    from azure.core.credentials import AzureKeyCredential
+    from azure.ai.language.conversations import ConversationAnalysisClient
+    CLU_SDK_AVAILABLE = True
+except ImportError:
+    CLU_SDK_AVAILABLE = False
+    print("WARNING: Azure CLU SDK not installed.")
 
 # CONFIG
 DISTANCE_SCALE = 0.1
@@ -70,19 +64,17 @@ FRAME_DURATION_MS = 30
 FRAME_SIZE = int(SAMPLE_RATE * FRAME_DURATION_MS / 1000)
 BYTES_PER_SAMPLE = 2
 
-# VAD params - BALANCED: not too aggressive, not too sensitive
-VAD_MODE = 2  # Aggressiveness (0-3, higher = filters more noise, but baseline uses 2)
-PRE_SPEECH_FRAMES = 10  # Standard buffer
-SILENCE_TIMEOUT_SECS = 0.4  # 400ms - balanced between 0.25 (too fast) and 0.6 (baseline)
+# VAD params
+VAD_MODE = 2
+PRE_SPEECH_FRAMES = 10
+SILENCE_TIMEOUT_SECS = 0.6
 
 # Partial recognition debounce (wait for more text before executing)
-# KEY INSIGHT: Single commands work better with longer debounce (time for full phrase)
-# But joint commands need timeout fallback
-PARTIAL_DEBOUNCE_SECS = 0.4  # 400ms - longer than experimental, shorter than baseline
+# Increased to 500ms to give more time for "and" to be recognized
+PARTIAL_DEBOUNCE_SECS = 0.5  # Wait 500ms to see if more text arrives
 
 # Timeout for "and" commands - if we've been waiting this long, execute anyway
-# REDUCED from baseline 2.0s - that's way too long
-AND_COMMAND_TIMEOUT_SECS = 0.8  # Execute "and" commands after 800ms if no final
+AND_COMMAND_TIMEOUT_SECS = 2.0  # Don't wait more than 2s for final recognition
 
 # Phrase list
 PHRASE_LIST = [
@@ -110,11 +102,6 @@ emergency_halt = threading.Event()
 current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
 position_lock = threading.Lock()
 last_processed_text = ""  # Track what we've already processed
-
-# Learning system globals (initialized in main())
-command_processor = None
-intent_executor = None
-USE_LEARNING_SYSTEM = True  # Set to False to use simple parsing
 
 
 def split_into_commands(text: str):
@@ -215,38 +202,9 @@ def apply_delta_to_position(position: dict, delta: dict) -> dict:
     }
 
 
-def process_command_with_learning(text: str) -> bool:
+def process_multi_command_sentence(text: str):
     """
-    Process a command using the learning system (phrase bank → fuzzy → LLM).
-    Returns True if command was successfully processed.
-    """
-    global command_processor, current_position
-
-    if not LEARNING_SYSTEM_AVAILABLE or not USE_LEARNING_SYSTEM or command_processor is None:
-        # Fall back to simple parsing
-        positions = process_multi_command_sentence_simple(text)
-        if positions:
-            add_positions_to_queue(positions)
-            return True
-        return False
-
-    # Use the learning system
-    print(f"{get_timestamp()} 🧠 Learning system processing...")
-    success = command_processor.process_command(text)
-
-    if success:
-        # Sync position from executor
-        with position_lock:
-            state = intent_executor.get_state()
-            current_position = state["current_position"].copy()
-        print(f"{get_timestamp()}    Position synced: {current_position}")
-
-    return success
-
-
-def process_multi_command_sentence_simple(text: str):
-    """
-    Simple parser fallback - process a sentence with multiple movement commands.
+    Process a sentence that may contain multiple movement commands.
     Handles:
     - 'and' → combine deltas into single movement
     - 'then' → separate sequential movements
@@ -285,7 +243,7 @@ def process_multi_command_sentence_simple(text: str):
                         "command_text": combined_text,
                         "delta": accumulated_delta.copy()
                     })
-                    print(f"  ✓ Combined movement: {accumulated_delta}")
+                    print(f"  [+] Combined movement: {accumulated_delta}")
                     print(f"     Position: x={temp_position['x']:.3f}, y={temp_position['y']:.3f}, z={temp_position['z']:.3f}")
 
                     # Reset accumulator
@@ -303,7 +261,7 @@ def process_multi_command_sentence_simple(text: str):
                         "command_text": combined_text,
                         "delta": accumulated_delta.copy()
                     })
-                    print(f"  ✓ Combined movement: {accumulated_delta}")
+                    print(f"  [+] Combined movement: {accumulated_delta}")
                     print(f"     Position: x={temp_position['x']:.3f}, y={temp_position['y']:.3f}, z={temp_position['z']:.3f}")
 
                     # Reset accumulator
@@ -321,107 +279,6 @@ def process_multi_command_sentence_simple(text: str):
                 print(f"     Position: x={temp_position['x']:.3f}, y={temp_position['y']:.3f}, z={temp_position['z']:.3f}")
 
     return positions
-
-
-def process_multi_command_sentence(text: str):
-    """
-    Main entry point for processing commands.
-    Routes to learning system for single commands, uses simple parser for multi-part.
-    Returns positions list for compatibility with existing code.
-    """
-    global command_processor, intent_executor
-
-    # Skip empty text
-    if not text or len(text.strip()) < 2:
-        return []
-
-    text_lower = text.lower().strip()
-
-    # Filter out common speech fillers that shouldn't be commands
-    # These often get fuzzy-matched to movement directions incorrectly
-    ignore_phrases = [
-        "that's right", "thats right", "all right", "alright",
-        "right?", "right.", "okay", "ok", "yes", "yeah", "yep",
-        "no", "nope", "um", "uh", "like", "so", "well",
-        "got it", "i see", "sure", "thanks", "thank you"
-    ]
-    text_clean = text_lower.rstrip('.').rstrip('?').rstrip('!')
-    if text_clean in ignore_phrases:
-        print(f"{get_timestamp()} ⏭️ Ignoring filler phrase: '{text}'")
-        return []
-
-    # Skip single incomplete words that are likely partial speech
-    # e.g., "move" alone shouldn't trigger a command
-    # BUT don't skip if phrase contains a direction word (e.g., "the left" is valid)
-    direction_words = ['right', 'left', 'up', 'down', 'forward', 'backward', 'back']
-    words = text_clean.split()
-    has_direction = any(w in direction_words for w in words)
-
-    if len(words) == 1 and words[0] in ['move', 'go', 'uh', 'um', 'the', 'a', 'to']:
-        print(f"{get_timestamp()} ⏭️ Ignoring incomplete single word: '{text}'")
-        return []
-
-    # Also allow short phrases that contain directions (e.g., "the left", "to the right")
-    if not has_direction and len(words) <= 2:
-        filler_only = all(w in ['the', 'a', 'to', 'go', 'move', 'uh', 'um'] for w in words)
-        if filler_only:
-            print(f"{get_timestamp()} ⏭️ Ignoring incomplete phrase: '{text}'")
-            return []
-
-    # For multi-part commands ("and"/"then"), use simple parser which handles combining
-    has_connector = ' and ' in text_lower or ' then ' in text_lower
-    if has_connector:
-        print(f"{get_timestamp()} 📝 Multi-part command detected, using simple parser...")
-        positions = process_multi_command_sentence_simple(text)
-
-        # Sync executor position with final position from simple parser
-        if positions and intent_executor is not None:
-            final_pos = positions[-1]["position"]
-            intent_executor.set_position(final_pos)
-
-        return positions
-
-    # For single commands, try learning system first
-    if LEARNING_SYSTEM_AVAILABLE and USE_LEARNING_SYSTEM and command_processor is not None:
-        global current_position  # Must declare before any use
-        print(f"{get_timestamp()} 🧠 Using learning system...")
-
-        # Get position before execution to calculate delta
-        with position_lock:
-            pos_before = current_position.copy()
-
-        success = command_processor.process_command(text)
-
-        if success:
-            # Sync position from executor
-            with position_lock:
-                state = intent_executor.get_state()
-                new_pos = state["current_position"].copy()
-
-                # Calculate actual delta
-                delta = {
-                    "x": new_pos["x"] - pos_before["x"],
-                    "y": new_pos["y"] - pos_before["y"],
-                    "z": new_pos["z"] - pos_before["z"]
-                }
-
-                current_position = new_pos
-
-            # Return positions list with actual position and delta
-            # Note: IntentExecutor already wrote to JSON, but add_positions_to_queue
-            # will write again - that's fine, it ensures consistency
-            return [{
-                "position": new_pos.copy(),
-                "command_text": text,
-                "delta": delta
-            }]
-        else:
-            # Learning system failed, try simple parser as fallback
-            print(f"{get_timestamp()} 📝 Learning failed, trying simple parser...")
-            return process_multi_command_sentence_simple(text)
-
-    # Fall back to simple parsing
-    return process_multi_command_sentence_simple(text)
 
 
 def add_positions_to_queue(positions: list):
@@ -446,7 +303,7 @@ def add_positions_to_queue(positions: list):
             current_position = positions[-1]["position"].copy()
         
         save_command_queue()
-        print(f"{get_timestamp()} ✅ Added {len(positions)} command(s) | Queue total: {len(command_queue)}")
+        print(f"{get_timestamp()} [OK] Added {len(positions)} command(s) | Queue total: {len(command_queue)}")
 
 
 def save_command_queue():
@@ -461,7 +318,7 @@ def save_command_queue():
             
             if latest_move:
                 json.dump(latest_move, f, indent=2)
-                print(f"{get_timestamp()}    📤 Written to JSON: {latest_move}")
+                print(f"{get_timestamp()}    Written to JSON: {latest_move}")
             else:
                 json.dump({}, f)
         else:
@@ -500,10 +357,10 @@ def load_current_position():
                     if 'x' in unity_pos and 'y' in unity_pos and 'z' in unity_pos:
                         with position_lock:
                             current_position = unity_pos
-                        print(f"✓ Loaded position from tcp_commands.json: {current_position}")
+                        print(f"[OK] Loaded position from tcp_commands.json: {current_position}")
                         return True
     except Exception as e:
-        print(f"⚠ Could not load position from tcp_commands.json ({e}), using default")
+        print(f"[WARN] Could not load position from tcp_commands.json ({e}), using default")
     return False
 
 
@@ -514,15 +371,15 @@ def save_current_position():
             pos = current_position.copy()
         with open(COMMAND_QUEUE_FILE, 'w') as f:
             json.dump(pos, f, indent=2)
-        print(f"✓ Saved final position to tcp_commands.json: {pos}")
+        print(f"[OK] Saved final position to tcp_commands.json: {pos}")
     except Exception as e:
-        print(f"⚠ Could not save position: {e}")
+        print(f"[WARN] Could not save position: {e}")
 
 
 def emergency_shutdown():
     """Immediately shutdown the entire program."""
     print("\n" + "="*60)
-    print("🚨 EMERGENCY SHUTDOWN TRIGGERED 🚨")
+    print("*** EMERGENCY SHUTDOWN TRIGGERED ***")
     print("="*60)
     os._exit(0)  # Force immediate exit
 
@@ -535,7 +392,6 @@ class MicToAzureStream:
         self.pending_partial_timer = None  # Timer for debounced execution
         self.pending_and_timer = None  # Timer for "and" command timeout
         self.executed_in_partial = ""  # Track what we already executed during partial
-        self.executed_via_timeout = False  # Track if execution was via AND timeout
         self.partial_lock = threading.Lock()  # Protect shared state
 
         self.push_stream = speechsdk.audio.PushAudioInputStream()
@@ -550,17 +406,15 @@ class MicToAzureStream:
         speech_config.output_format = speechsdk.OutputFormat.Simple
         speech_config.speech_recognition_language = "en-US"
         
-        # BALANCED endpoint detection - not too fast (cuts off speech), not too slow (latency)
-        # Baseline uses 500ms which works well for single commands
-        # We use 350ms as a compromise
+        # Balanced endpoint detection
         speech_config.set_property(
-            speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "350"
+            speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500"
         )
         speech_config.set_property(
-            speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "350"
+            speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "500"
         )
         speech_config.set_property(
-            speechsdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "2500"
+            speechsdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "3000"
         )
 
         self.recognizer = speechsdk.SpeechRecognizer(
@@ -615,15 +469,14 @@ class MicToAzureStream:
                 return
 
             print()
-            print(f"{get_timestamp()} ⏱️ AND TIMEOUT: Executing after {AND_COMMAND_TIMEOUT_SECS}s wait")
-            print(f"{get_timestamp()} ⚡ EXEC (timeout): '{captured_text}'")
+            print(f"{get_timestamp()} AND TIMEOUT: Executing after {AND_COMMAND_TIMEOUT_SECS}s wait")
+            print(f"{get_timestamp()} EXEC (timeout): '{captured_text}'")
 
             positions = process_multi_command_sentence(captured_text)
             if positions:
                 add_positions_to_queue(positions)
-                print(f"{get_timestamp()} ➜ Robot executing (and-timeout)!\n")
+                print(f"{get_timestamp()} -> Robot executing (and-timeout)!\n")
                 self.executed_in_partial = captured_text
-                self.executed_via_timeout = True  # Mark as timeout execution
 
     def _execute_partial_command(self, captured_text):
         """Execute a partial command after debounce delay."""
@@ -649,22 +502,13 @@ class MicToAzureStream:
             if self.executed_in_partial and captured_text.lower().strip() in self.executed_in_partial.lower():
                 return
 
-            # Check if what we executed is a prefix of what we're about to execute
-            # This prevents re-executing when partial text just grows (e.g., "go back" → "go back to position")
-            if self.executed_in_partial:
-                executed_lower = self.executed_in_partial.lower().strip()
-                captured_lower_clean = captured_text.lower().strip()
-                if captured_lower_clean.startswith(executed_lower):
-                    # The new text just extends what we already executed - skip
-                    return
-
             # Process the command
             positions = process_multi_command_sentence(captured_text)
             if positions:
                 print()  # New line after partial text
-                print(f"{get_timestamp()} ⚡ EXEC PARTIAL: '{captured_text}'")
+                print(f"{get_timestamp()} EXEC PARTIAL: '{captured_text}'")
                 add_positions_to_queue(positions)
-                print(f"{get_timestamp()} ➜ Robot executing partial command!\n")
+                print(f"{get_timestamp()} -> Robot executing partial command!\n")
                 # Track what we executed
                 self.executed_in_partial = captured_text
 
@@ -678,7 +522,7 @@ class MicToAzureStream:
 
         # Check for emergency words FIRST
         if check_for_emergency_words(text):
-            print(f"\n🚨 [EMERGENCY HALT] - TERMINATING NOW!")
+            print(f"\n*** [EMERGENCY HALT] - TERMINATING NOW! ***")
             emergency_shutdown()
 
         with self.partial_lock:
@@ -715,26 +559,28 @@ class MicToAzureStream:
                     self.last_partial_text = text
                     return
 
-            # For phrases ending in direction words, we STILL want to execute
-            # but with a slightly longer debounce to catch potential "and X"
-            # This is the KEY FIX: baseline waited forever, experimental was too fast
+            # IMPORTANT: Skip partial execution if phrase ends with a direction word
+            # These commonly precede "and" (e.g., "move right and up")
+            # We want to wait for the full phrase to preserve combining behavior
             direction_words = ['right', 'left', 'up', 'down', 'forward', 'forwards',
                               'backward', 'backwards', 'back', 'upward', 'upwards',
                               'downward', 'downwards']
             words = text_lower.split()
-            ends_with_direction = words and words[-1] in direction_words and len(words) <= 4
+            if words and words[-1] in direction_words:
+                # Check if this is a short phrase that likely has more coming
+                # e.g., "move right" (2 words) vs "move to the right please" (5 words)
+                if len(words) <= 4:
+                    # Don't execute yet - wait for potential "and X"
+                    self.last_partial_text = text
+                    return
 
             # Process commands on partial recognition if text is different from last time
             # AND we haven't already executed this exact text
             if text != self.last_partial_text and len(text) > 3:
                 if text != self.executed_in_partial:
-                    # Use longer debounce for direction-ending phrases (wait for "and")
-                    # Use normal debounce for other phrases
-                    debounce_time = PARTIAL_DEBOUNCE_SECS + 0.2 if ends_with_direction else PARTIAL_DEBOUNCE_SECS
-
                     # Start new debounce timer
                     self.pending_partial_timer = threading.Timer(
-                        debounce_time,
+                        PARTIAL_DEBOUNCE_SECS,
                         self._execute_partial_command,
                         args=[text]
                     )
@@ -746,7 +592,7 @@ class MicToAzureStream:
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
             text = evt.result.text
             timestamp = time.time()
-            print(f"\n\n{get_timestamp()} ✓ [FINAL] {text}")
+            print(f"\n\n{get_timestamp()} [FINAL] {text}")
 
             with self.partial_lock:
                 # Cancel any pending timers - we have final text now
@@ -759,7 +605,7 @@ class MicToAzureStream:
 
                 # Double-check for emergency words
                 if check_for_emergency_words(text):
-                    print(f"🚨 [EMERGENCY HALT] - TERMINATING!")
+                    print(f"*** [EMERGENCY HALT] - TERMINATING! ***")
                     emergency_shutdown()
 
                 # Check if we already executed this (or essentially the same thing) in partial
@@ -769,29 +615,6 @@ class MicToAzureStream:
                 # If partial already executed something, we need to figure out what's new
                 if executed:
                     executed_clean = executed.rstrip('.')
-
-                    # ONLY use fuzzy overlap for timeout-executed "and" commands
-                    # For regular partial executions, use exact matching to allow repeated commands
-                    if self.executed_via_timeout:
-                        # Check if final is essentially the same as what timeout executed
-                        # (handles punctuation differences, "uh" prefixes, etc.)
-                        final_words = set(final_text.replace(',', '').replace('.', '').split())
-                        executed_words = set(executed_clean.replace(',', '').replace('.', '').split())
-                        # Remove filler words for comparison
-                        filler_words = {'uh', 'um', 'ah', 'like', 'so'}
-                        final_words -= filler_words
-                        executed_words -= filler_words
-
-                        # If 80%+ word overlap, consider it the same command
-                        if final_words and executed_words:
-                            overlap = len(final_words & executed_words) / max(len(final_words), len(executed_words))
-                            if overlap >= 0.8:
-                                print(f"{get_timestamp()}   └─ Skipping (already executed via timeout, {overlap:.0%} overlap)\n")
-                                self.last_partial_text = ""
-                                self.executed_in_partial = ""
-                                self.executed_via_timeout = False
-                                return
-
                     # Case 1: Final is same as what we executed (just with punctuation)
                     if final_text == executed_clean or final_text.startswith(executed_clean):
                         # Check if there's genuinely new content after what we executed
@@ -813,11 +636,11 @@ class MicToAzureStream:
                                 # Execute remaining as separate movement (better than nothing)
                                 # but warn about the missed combination
                                 print(f"{get_timestamp()}   └─ Partial already executed: '{executed}'")
-                                print(f"{get_timestamp()}   ⚠ Missed combination! Executing remaining separately: '{remaining}'")
+                                print(f"{get_timestamp()}   [WARN] Missed combination! Executing remaining separately: '{remaining}'")
                                 positions = process_multi_command_sentence(remaining)
                                 if positions:
                                     add_positions_to_queue(positions)
-                                    print(f"{get_timestamp()} ➜ Final (remaining) commands sent!\n")
+                                    print(f"{get_timestamp()} -> Final (remaining) commands sent!\n")
                             else:
                                 # Sequential command ("then") - execute remaining
                                 print(f"{get_timestamp()}   └─ Partial already executed: '{executed}'")
@@ -825,33 +648,28 @@ class MicToAzureStream:
                                 positions = process_multi_command_sentence(remaining)
                                 if positions:
                                     add_positions_to_queue(positions)
-                                    print(f"{get_timestamp()} ➜ Final (remaining) commands sent!\n")
+                                    print(f"{get_timestamp()} -> Final (remaining) commands sent!\n")
                         else:
                             print(f"{get_timestamp()}   └─ Skipping (already executed in partial)\n")
                     else:
                         # Final text is different - process the whole thing
                         # but this shouldn't happen often
-                        print(f"{get_timestamp()} ⚡ EXEC FINAL (different): '{text}'")
+                        print(f"{get_timestamp()} EXEC FINAL (different): '{text}'")
                         positions = process_multi_command_sentence(text)
                         if positions:
                             add_positions_to_queue(positions)
-                            print(f"{get_timestamp()} ➜ Final commands sent!\n")
+                            print(f"{get_timestamp()} -> Final commands sent!\n")
                 else:
                     # Nothing was executed in partial - process everything
-                    # Skip empty finals
-                    if not text or len(text.strip()) < 3:
-                        print(f"{get_timestamp()}   └─ Skipping empty final\n")
-                    else:
-                        print(f"{get_timestamp()} ⚡ EXEC FINAL: '{text}'")
-                        positions = process_multi_command_sentence(text)
-                        if positions:
-                            add_positions_to_queue(positions)
-                            print(f"{get_timestamp()} ➜ Final commands sent!\n")
+                    print(f"{get_timestamp()} EXEC FINAL: '{text}'")
+                    positions = process_multi_command_sentence(text)
+                    if positions:
+                        add_positions_to_queue(positions)
+                        print(f"{get_timestamp()} -> Final commands sent!\n")
 
                 # Reset trackers for next utterance
                 self.last_partial_text = ""
                 self.executed_in_partial = ""
-                self.executed_via_timeout = False
 
             # Log to file
             with open(LOG_FILE, "a", encoding="utf-8") as fh:
@@ -863,7 +681,7 @@ class MicToAzureStream:
                 fh.write(json.dumps(record) + "\n")
 
         elif evt.result.reason == speechsdk.ResultReason.NoMatch:
-            print("\n⚠ [No speech recognized]\n")
+            print("\n[No speech recognized]\n")
             with self.partial_lock:
                 self.last_partial_text = ""
                 self.executed_in_partial = ""
@@ -895,7 +713,7 @@ def mic_capture_thread(stream_writer: MicToAzureStream, stop_event):
         callback=callback
     ):
         print("Mic stream opened. Speak into the microphone.")
-        print(f"🚨 Say '{EMERGENCY_WORDS[0]}' to shutdown\n")
+        print(f"Say '{EMERGENCY_WORDS[0]}' to shutdown\n")
         
         try:
             while not stop_event.is_set():
@@ -932,49 +750,22 @@ def mic_capture_thread(stream_writer: MicToAzureStream, stop_event):
 
 
 def main():
-    global command_processor, intent_executor, current_position
-
     print("="*60)
-    print("Speech-to-Robot Control System + Learning")
+    print("Speech-to-Robot Control System")
     print("="*60)
-    print(f"🚨 Emergency words: {EMERGENCY_WORDS}")
-    print(f"📁 Command file: {COMMAND_QUEUE_FILE}")
+    print(f"Emergency words: {EMERGENCY_WORDS}")
+    print(f"Command file: {COMMAND_QUEUE_FILE}")
 
     # Load current position from tcp_commands.json (Unity's last position)
     load_current_position()
-    print(f"📍 Start position: {current_position}\n")
-
-    # Initialize learning system
-    if LEARNING_SYSTEM_AVAILABLE and USE_LEARNING_SYSTEM:
-        try:
-            print("🧠 Initializing learning system...")
-            # Disable executor's file writing - main script handles JSON output
-            intent_executor = IntentExecutor(command_queue_file=COMMAND_QUEUE_FILE, write_to_file=False)
-            # Sync executor's position with loaded position
-            intent_executor.set_position(current_position.copy())
-
-            command_processor = CommandProcessor(intent_executor, enable_llm=True)
-
-            print(f"📚 Phrase Bank Stats:")
-            stats = command_processor.phrase_bank.get_stats()
-            print(f"   Total phrases: {stats['total_phrases']}")
-            print(f"   Named locations: {stats['named_locations']}")
-            print(f"   Most used: {stats.get('most_used_phrase', 'N/A')}")
-            print()
-        except Exception as e:
-            print(f"⚠ Failed to initialize learning system: {e}")
-            print("  Falling back to simple command parsing")
-            command_processor = None
-            intent_executor = None
-    else:
-        print("ℹ Learning system disabled, using simple command parsing")
-
+    print(f"Start position: {current_position}\n")
+    
     stop_event = threading.Event()
     stream_writer = None
 
     try:
         stream_writer = MicToAzureStream(
-            speech_key=AZURE_SPEECH_KEY,
+            speech_key=AZURE_SPEECH_KEY, 
             region=AZURE_SPEECH_REGION,
             stop_event=stop_event
         )
@@ -986,12 +777,12 @@ def main():
         )
         mic_thread.start()
 
-        print("🎤 Ready! Speak your commands...\n")
+        print("Ready! Speak your commands...\n")
         
         while not stop_event.is_set():
             time.sleep(0.1)
     except KeyboardInterrupt:
-        print("\n⚠ Keyboard interrupt...")
+        print("\nKeyboard interrupt...")
     finally:
         if not stop_event.is_set():
             stop_event.set()
@@ -1001,10 +792,6 @@ def main():
 
         # Save final position back to tcp_commands.json
         save_current_position()
-
-        # Print learning system stats if available
-        if command_processor is not None:
-            command_processor.print_stats()
 
         print("\n" + "="*60)
         print("Program stopped.")

@@ -59,6 +59,10 @@ class CommandProcessor:
         Returns:
             True if command was successfully executed, False otherwise
         """
+        # Skip empty commands
+        if not voice_command or len(voice_command.strip()) < 2:
+            return False
+
         self.stats["total_commands"] += 1
 
         print(f"\n🎤 Processing: '{voice_command}'")
@@ -118,6 +122,28 @@ class CommandProcessor:
 
     def _learn_phrase(self, phrase: str, llm_result: Dict):
         """Add a new phrase to the phrase bank."""
+        # Don't learn garbage phrases
+        phrase_lower = phrase.lower().strip()
+
+        # Skip if phrase is too long (likely concatenated commands)
+        word_count = len(phrase_lower.split())
+        if word_count > 8:
+            print(f"⚠️ Skipping learning: phrase too long ({word_count} words)")
+            return
+
+        # Skip if phrase contains multiple sentences (period in middle)
+        clean_phrase = phrase_lower.rstrip('.')
+        if '.' in clean_phrase:
+            print("⚠️ Skipping learning: multiple sentences detected")
+            return
+
+        # Skip if phrase repeats intent keywords (likely two commands)
+        direction_words = ['right', 'left', 'up', 'down', 'forward', 'backward', 'back']
+        direction_count = sum(1 for w in direction_words if w in phrase_lower)
+        if direction_count > 2:
+            print(f"⚠️ Skipping learning: too many directions ({direction_count})")
+            return
+
         self.phrase_bank.add_phrase(
             phrase=phrase,
             intent=llm_result["intent"],
@@ -126,6 +152,7 @@ class CommandProcessor:
         )
         self.stats["phrases_learned"] += 1
 
+        print(f"✓ Learned new phrase: '{phrase}' → {llm_result['intent']}")
         print(f"📚 Learned new phrase (total learned: {self.stats['phrases_learned']})")
 
     def get_stats(self) -> Dict:
