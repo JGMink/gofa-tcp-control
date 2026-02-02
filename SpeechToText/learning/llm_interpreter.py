@@ -26,7 +26,7 @@ class LLMInterpreter:
     Returns intent + parameters + confidence for learning system.
     """
 
-    def __init__(self):
+    def __init__(self, phrase_bank=None):
         if not ANTHROPIC_AVAILABLE:
             raise ImportError("Anthropic SDK not installed")
 
@@ -35,58 +35,95 @@ class LLMInterpreter:
 
         self.client = Anthropic(api_key=ANTHROPIC_API_KEY)
         self.model = ANTHROPIC_MODEL
+        self.phrase_bank = phrase_bank  # Optional reference for dynamic context
+
+    def set_phrase_bank(self, phrase_bank):
+        """Set phrase bank reference for dynamic context in prompts."""
+        self.phrase_bank = phrase_bank
+
+    def _get_named_locations(self) -> str:
+        """Get list of named locations for prompt context."""
+        if self.phrase_bank:
+            locations = self.phrase_bank.data.get("named_locations", {})
+            if locations:
+                # Include position info for context
+                parts = []
+                for name, pos in locations.items():
+                    parts.append(f'"{name}"')
+                return ", ".join(parts)
+        return '"home", "start"'  # Default
 
     def _build_prompt(self, voice_command: str) -> str:
         """
         Build prompt for Claude to extract intent from voice command.
         """
-        prompt = f"""You are interpreting robot voice commands. Extract the intent and parameters.
+        prompt = f"""You are interpreting voice commands for an ABB GoFa robot arm. Extract the intent and parameters.
+
+IMPORTANT CONTEXT:
+- This is a speech-to-robot control system
+- Users speak naturally, often using qualitative terms instead of exact measurements
+- The robot understands relative movements in 6 directions
 
 Available Intents:
+
 1. move_relative - Move in a direction by a distance
-   Parameters: direction (right/left/up/down/forward/backward), distance (float), unit (cm/mm)
-   Examples: "move right 5 cm", "go up", "shift left 10 centimeters"
+   Parameters: direction (right/left/up/down/forward/backward), distance (float in cm)
+
+   Qualitative distance mappings (use these exact values):
+   - "tiny", "teensy", "small", "just a hair" -> distance: 0.3
+   - "little bit", "slightly", "a bit", "a tad" -> distance: 0.5
+   - No qualifier or "normal" -> distance: 1.0
+   - "large", "big", "a lot", "far" -> distance: 2.0
+
+   Examples:
+   - "move right 5" -> direction: "right", distance: 5.0
+   - "shift left a teensy bit" -> direction: "left", distance: 0.3
+   - "go up a little" -> direction: "up", distance: 0.5
+   - "move forward" -> direction: "forward", distance: 1.0
+   - "nudge it right" -> direction: "right", distance: 0.3
 
 2. move_to_previous - Return to the last position
    Parameters: (none)
-   Examples: "go back", "return to previous position", "put it back where it was"
+   Examples: "go back", "undo", "return to previous", "put it back"
 
 3. move_to_named - Move to a saved named location
-   Parameters: location (string)
-   Examples: "go home", "move to pickup position", "go to station A"
+   Parameters: location_name (string)
+   Available locations: {self._get_named_locations()}
+   Examples: "go home", "go to start", "move to starting position", "return to home"
+   Note: "starting position", "start", "origin" should map to "home"
 
 4. emergency_stop - Immediately halt all movement
    Parameters: (none)
-   Examples: "stop", "halt", "emergency"
+   Examples: "stop", "halt", "emergency", "freeze"
 
-5. gripper_open - Open the gripper (future hardware)
+5. gripper_open - Open the gripper
    Parameters: (none)
-   Examples: "open gripper", "release", "let go"
+   Examples: "open gripper", "release", "let go", "drop it"
 
-6. gripper_close - Close the gripper (future hardware)
+6. gripper_close - Close the gripper
    Parameters: (none)
-   Examples: "close gripper", "grab", "grip"
+   Examples: "close gripper", "grab", "grip", "pick up"
 
 7. save_named_location - Save current position with a name
-   Parameters: location (string)
-   Examples: "save this as home", "remember this as pickup"
+   Parameters: location_name (string)
+   Examples: "save this as home", "remember this position as pickup"
 
-Return a JSON object with:
+Return ONLY a JSON object:
 {{
   "intent": "intent_name",
-  "params": {{parameter_dict}},
+  "params": {{}},
   "confidence": 0.95
 }}
 
-Important:
-- confidence should be 0.0-1.0 (how sure you are)
-- Use 1.0 for exact matches, 0.9-0.95 for clear interpretations, lower for ambiguous
-- For move_relative with no distance specified, use distance: 1.0, unit: "cm"
+Rules:
+- confidence: 0.9-1.0 for clear commands, 0.7-0.9 for interpreted, below 0.7 for unclear
 - direction must be lowercase
+- If the command is gibberish, empty, or not a robot command, return confidence: 0.0
+- For commands like "I moved..." (past tense describing what happened), interpret as a command to move
 
 Command: "{voice_command}"
 
-JSON Response:"""
+JSON:"""
 
         return prompt
 

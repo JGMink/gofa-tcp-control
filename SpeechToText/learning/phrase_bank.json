@@ -28,7 +28,7 @@
         "unit": "cm"
       },
       "confidence": 1.0,
-      "usage_count": 3
+      "usage_count": 4
     },
     "go left": {
       "intent": "move_relative",
@@ -186,7 +186,7 @@
       "intent": "move_to_previous",
       "params": {},
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 1
     },
     "go home": {
       "intent": "move_to_named",
@@ -202,7 +202,7 @@
         "location": "home"
       },
       "confidence": 1.0,
-      "usage_count": 0
+      "usage_count": 1
     },
     "stop": {
       "intent": "emergency_stop",
@@ -293,18 +293,33 @@
       },
       "confidence": 0.9,
       "usage_count": 2
+    },
+    "i moved just a teensy": {
+      "intent": "move_relative",
+      "params": {
+        "direction": "forward",
+        "distance": 1.0,
+        "unit": "cm"
+      },
+      "confidence": 0.9,
+      "usage_count": 2
     }
   },
   "named_locations": {
     "home": {
       "x": 0.0,
-      "y": 0.0,
-      "z": 0.0
+      "y": 0.567,
+      "z": -0.24
+    },
+    "start": {
+      "x": 0.0,
+      "y": 0.567,
+      "z": -0.24
     }
   },
   "metadata": {
     "version": "1.0",
-    "last_updated": "2026-01-27T16:55:07.668827",
+    "last_updated": "2026-01-30T12:19:55.563778",
     "total_phrases_learned": 0
   }
 }

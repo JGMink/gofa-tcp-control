@@ -1,0 +1,96 @@
+{
+  "primitives": {
+    "move_to": {
+      "description": "Move the robot arm to a named location",
+      "parameters": {
+        "location": "string - name of the target location"
+      },
+      "example": "move_to(\"cheese_stack\")"
+    },
+    "move_relative": {
+      "description": "Move the robot arm relative to current position",
+      "parameters": {
+        "direction": "string - one of: right, left, up, down, forward, backward",
+        "distance": "float - distance in cm (0.3=tiny, 0.5=small, 1.0=normal, 2.0=large)"
+      },
+      "example": "move_relative(\"up\", 5.0)"
+    },
+    "gripper_open": {
+      "description": "Open the gripper to release an item",
+      "parameters": {},
+      "example": "gripper_open()"
+    },
+    "gripper_close": {
+      "description": "Close the gripper to grab an item",
+      "parameters": {},
+      "example": "gripper_close()"
+    },
+    "wait": {
+      "description": "Pause execution for a duration",
+      "parameters": {
+        "seconds": "float - time to wait"
+      },
+      "example": "wait(0.5)"
+    }
+  },
+  "composites": {
+    "pick_up": {
+      "description": "Pick up an item from its location",
+      "parameters": {
+        "item": "string - name of the item to pick up"
+      },
+      "sequence": [
+        {"instruction": "move_to", "params": {"location": "{item}_stack"}},
+        {"instruction": "gripper_close", "params": {}},
+        {"instruction": "move_relative", "params": {"direction": "up", "distance": 5.0}}
+      ],
+      "learned": false,
+      "confidence": 1.0
+    },
+    "place_at": {
+      "description": "Place the currently held item at a location",
+      "parameters": {
+        "location": "string - name of the target location"
+      },
+      "sequence": [
+        {"instruction": "move_to", "params": {"location": "{location}"}},
+        {"instruction": "move_relative", "params": {"direction": "down", "distance": 3.0}},
+        {"instruction": "gripper_open", "params": {}},
+        {"instruction": "move_relative", "params": {"direction": "up", "distance": 3.0}}
+      ],
+      "learned": false,
+      "confidence": 1.0
+    },
+    "transfer": {
+      "description": "Transfer an item from its stack to a destination",
+      "parameters": {
+        "item": "string - name of the item",
+        "destination": "string - name of the destination location"
+      },
+      "sequence": [
+        {"instruction": "pick_up", "params": {"item": "{item}"}},
+        {"instruction": "place_at", "params": {"location": "{destination}"}}
+      ],
+      "learned": false,
+      "confidence": 1.0
+    },
+    "go_home": {
+      "description": "Return to the home/starting position",
+      "parameters": {},
+      "sequence": [
+        {"instruction": "move_to", "params": {"location": "home"}}
+      ],
+      "learned": false,
+      "confidence": 1.0
+    }
+  },
+  "meta": {
+    "version": "1.0",
+    "description": "Hierarchical instruction set for robot arm control. Primitives are atomic, composites are sequences of primitives or other composites.",
+    "notes": [
+      "Parameters in sequences can use {param_name} for substitution",
+      "Composites can call other composites (recursive expansion)",
+      "Learned composites have learned=true and confidence<1.0"
+    ]
+  }
+}

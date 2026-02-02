@@ -27,7 +27,8 @@ FUZZY_MATCH_THRESHOLD = float(os.getenv("FUZZY_MATCH_THRESHOLD", "0.6"))
 
 # LLM confidence threshold for auto-learning
 # Only save phrases if LLM is this confident
-LLM_CONFIDENCE_THRESHOLD = float(os.getenv("LLM_CONFIDENCE_THRESHOLD", "0.90"))
+# Lowered to 0.8 since we have a more detailed prompt now
+LLM_CONFIDENCE_THRESHOLD = float(os.getenv("LLM_CONFIDENCE_THRESHOLD", "0.80"))
 
 # Command queue file path (relative to SpeechToText directory)
 COMMAND_QUEUE_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "UnityProject", "tcp_commands.json")

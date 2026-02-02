@@ -1,0 +1,120 @@
+{
+  "scene": {
+    "name": "sandwich_assembly",
+    "description": "A workspace with ingredient stacks and an assembly zone for building sandwiches"
+  },
+  "items": {
+    "bread": {
+      "description": "Sliced bread for sandwich base and top",
+      "stack_location": "bread_stack",
+      "properties": {
+        "stackable": true,
+        "fragile": false
+      }
+    },
+    "cheese": {
+      "description": "Cheese slice",
+      "stack_location": "cheese_stack",
+      "properties": {
+        "stackable": true,
+        "fragile": false
+      }
+    },
+    "lettuce": {
+      "description": "Lettuce leaf",
+      "stack_location": "lettuce_stack",
+      "properties": {
+        "stackable": true,
+        "fragile": true
+      }
+    },
+    "tomato": {
+      "description": "Tomato slice",
+      "stack_location": "tomato_stack",
+      "properties": {
+        "stackable": true,
+        "fragile": true
+      }
+    },
+    "meat": {
+      "description": "Deli meat slice",
+      "stack_location": "meat_stack",
+      "properties": {
+        "stackable": true,
+        "fragile": false
+      }
+    }
+  },
+  "locations": {
+    "home": {
+      "description": "Robot home/starting position",
+      "position": {"x": 0.0, "y": 0.567, "z": -0.24},
+      "type": "waypoint"
+    },
+    "assembly_zone": {
+      "description": "Central area where sandwiches are assembled",
+      "position": {"x": 0.0, "y": 0.3, "z": 0.0},
+      "type": "workspace"
+    },
+    "bread_stack": {
+      "description": "Stack of bread slices",
+      "position": {"x": -0.2, "y": 0.3, "z": 0.1},
+      "type": "item_stack",
+      "item": "bread"
+    },
+    "cheese_stack": {
+      "description": "Stack of cheese slices",
+      "position": {"x": -0.1, "y": 0.3, "z": 0.1},
+      "type": "item_stack",
+      "item": "cheese"
+    },
+    "lettuce_stack": {
+      "description": "Stack of lettuce leaves",
+      "position": {"x": 0.0, "y": 0.3, "z": 0.1},
+      "type": "item_stack",
+      "item": "lettuce"
+    },
+    "tomato_stack": {
+      "description": "Stack of tomato slices",
+      "position": {"x": 0.1, "y": 0.3, "z": 0.1},
+      "type": "item_stack",
+      "item": "tomato"
+    },
+    "meat_stack": {
+      "description": "Stack of meat slices",
+      "position": {"x": 0.2, "y": 0.3, "z": 0.1},
+      "type": "item_stack",
+      "item": "meat"
+    }
+  },
+  "state": {
+    "gripper": "open",
+    "holding": null,
+    "assembly_stack": [],
+    "current_position": "home"
+  },
+  "recipes": {
+    "blt": {
+      "description": "Bacon Lettuce Tomato sandwich",
+      "layers": ["bread", "meat", "lettuce", "tomato", "bread"],
+      "notes": "Using deli meat as bacon substitute"
+    },
+    "cheese_sandwich": {
+      "description": "Simple cheese sandwich",
+      "layers": ["bread", "cheese", "bread"]
+    },
+    "club": {
+      "description": "Club sandwich with everything",
+      "layers": ["bread", "meat", "cheese", "lettuce", "tomato", "bread"]
+    }
+  },
+  "meta": {
+    "version": "1.0",
+    "units": "meters for positions, Unity coordinate system",
+    "notes": [
+      "Positions are approximate - will be calibrated with actual robot",
+      "Stack heights will need dynamic tracking as items are moved",
+      "Assembly zone builds from bottom up"
+    ]
+  }
+}
