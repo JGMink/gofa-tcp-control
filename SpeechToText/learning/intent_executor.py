@@ -33,10 +33,14 @@ class IntentExecutor:
         
         # Gripper state
         self.gripper_state = "open"  # "open", "closed", "unknown"
-        
+
+        # Object tracking
+        self.known_objects: Dict[str, dict] = {}  # object_name -> {position, held, properties}
+        self.held_object: Optional[str] = None  # Name of currently held object
+
         # Command queue
         self.command_queue: List[dict] = []
-        
+
         # Thread safety
         self.lock = threading.Lock()
         
@@ -95,6 +99,10 @@ class IntentExecutor:
             "gripper_close": self._handle_gripper_close,
             "emergency_stop": self._handle_emergency_stop,
             "resume": self._handle_resume,
+            "compound_command": self._handle_compound_command,
+            "move_to_object": self._handle_move_to_object,
+            "pick_object": self._handle_pick_object,
+            "place_object": self._handle_place_object,
         }
         
         handler = handler_map.get(intent)
@@ -247,14 +255,141 @@ class IntentExecutor:
     def _handle_resume(self, params: dict) -> Optional[dict]:
         """Resume after emergency stop."""
         self.emergency_halt.clear()
-        
+
         print("[IntentExecutor] ▶️ RESUMED")
-        
+
         return {
             "command_type": "resume",
             "timestamp": datetime.now().isoformat()
         }
-    
+
+    def _handle_compound_command(self, params: dict) -> Optional[dict]:
+        """Execute a sequence of commands."""
+        sequence = params.get("sequence", [])
+
+        if not sequence:
+            print("[IntentExecutor] Empty compound command sequence")
+            return None
+
+        if VERBOSE_LOGGING:
+            print(f"[IntentExecutor] Compound command: {len(sequence)} steps")
+
+        results = []
+        for step in sequence:
+            intent = step.get("intent")
+            step_params = step.get("params", {})
+
+            # Execute each step (but don't add to queue individually)
+            result = self.execute(intent, step_params)
+            if result:
+                results.append(result)
+
+        return {
+            "command_type": "compound",
+            "sequence": results,
+            "steps_completed": len(results)
+        }
+
+    def _handle_move_to_object(self, params: dict) -> Optional[dict]:
+        """Move to a known object's position."""
+        object_name = params.get("object_name")
+        if not object_name:
+            print("[IntentExecutor] No object name provided")
+            return None
+
+        with self.lock:
+            if object_name not in self.known_objects:
+                print(f"[IntentExecutor] Unknown object: '{object_name}'")
+                return {"command_type": "error", "message": f"I don't know where '{object_name}' is."}
+
+            obj_info = self.known_objects[object_name]
+            target_position = obj_info["position"].copy()
+
+            # Move slightly above the object for safety
+            target_position["y"] += 0.05  # 5cm above
+
+            self._update_position(target_position)
+
+        if VERBOSE_LOGGING:
+            print(f"[IntentExecutor] Moving to object '{object_name}': {target_position}")
+
+        return {
+            "command_type": "move",
+            "position": target_position,
+            "target_object": object_name
+        }
+
+    def _handle_pick_object(self, params: dict) -> Optional[dict]:
+        """Pick up an object (move to it, then close gripper)."""
+        object_name = params.get("object_name")
+        if not object_name:
+            print("[IntentExecutor] No object name provided")
+            return None
+
+        with self.lock:
+            if object_name not in self.known_objects:
+                print(f"[IntentExecutor] Unknown object: '{object_name}'")
+                return {"command_type": "error", "message": f"I don't know where '{object_name}' is."}
+
+            obj_info = self.known_objects[object_name]
+            target_position = obj_info["position"].copy()
+
+            # Move to object
+            self._update_position(target_position)
+
+            # Close gripper and mark object as held
+            self.gripper_state = "closed"
+            self.held_object = object_name
+            obj_info["held"] = True
+
+        if VERBOSE_LOGGING:
+            print(f"[IntentExecutor] Picking up '{object_name}'")
+
+        return {
+            "command_type": "pick",
+            "position": target_position,
+            "object_name": object_name,
+            "gripper_action": "close"
+        }
+
+    def _handle_place_object(self, params: dict) -> Optional[dict]:
+        """Place the held object at a location."""
+        location = params.get("location", "here")
+
+        with self.lock:
+            if not self.held_object:
+                print("[IntentExecutor] No object being held")
+                return {"command_type": "error", "message": "I'm not holding anything."}
+
+            place_position = self.current_position.copy()
+
+            # If location specified, resolve it
+            if location != "here":
+                phrase_bank = get_phrase_bank()
+                named_pos = phrase_bank.get_location(location)
+                if named_pos:
+                    place_position = named_pos.copy()
+
+            # Update object position
+            if self.held_object in self.known_objects:
+                self.known_objects[self.held_object]["position"] = place_position.copy()
+                self.known_objects[self.held_object]["held"] = False
+
+            # Open gripper and release
+            self.gripper_state = "open"
+            placed_object = self.held_object
+            self.held_object = None
+
+        if VERBOSE_LOGGING:
+            print(f"[IntentExecutor] Placing '{placed_object}' at {place_position}")
+
+        return {
+            "command_type": "place",
+            "position": place_position,
+            "object_name": placed_object,
+            "gripper_action": "open"
+        }
+
     def _update_position(self, new_position: dict):
         """Update current position and add to history (must be called with lock held)."""
         self.position_history.append(new_position.copy())
@@ -275,20 +410,29 @@ class IntentExecutor:
     def _save_commands(self):
         """Save current command to the JSON file (single command mode)."""
         with self.lock:
-            # Single command mode: just save the latest position
-            output = {}
+            # Single command mode: just save the latest position and gripper state
+            output = self.current_position.copy()  # Always include position
+
             if self.command_queue:
                 latest = self.command_queue[-1]
                 if latest.get("command_type") == "move" and "position" in latest:
-                    output = latest["position"]
+                    output.update(latest["position"])
                 elif latest.get("command_type") == "gripper":
-                    output = {"gripper_action": latest["action"]}
+                    # Convert gripper action to position value for Unity
+                    # RG2: 0.0 = fully closed, 0.11 = fully open
+                    gripper_pos = 0.11 if latest["action"] == "open" else 0.0
+                    output["gripper_position"] = gripper_pos
                 elif latest.get("command_type") == "emergency_halt":
-                    output = {"emergency_halt": True}
-            
+                    output["emergency_halt"] = True
+
+            # Always include current gripper state as position
+            if "gripper_position" not in output:
+                gripper_pos = 0.11 if self.gripper_state == "open" else 0.0
+                output["gripper_position"] = gripper_pos
+
             with open(self.command_queue_file, 'w') as f:
                 json.dump(output, f, indent=2)
-        
+
         if VERBOSE_LOGGING:
             print(f"[IntentExecutor] Saved to {self.command_queue_file}")
     
@@ -307,6 +451,30 @@ class IntentExecutor:
         """Manually set the current position (e.g., for sync with robot)."""
         with self.lock:
             self._update_position(position)
+
+    def register_object(self, name: str, position: dict, properties: dict = None):
+        """Register an object in the scene."""
+        with self.lock:
+            self.known_objects[name] = {
+                "position": position.copy(),
+                "held": False,
+                "properties": properties or {}
+            }
+        if VERBOSE_LOGGING:
+            print(f"[IntentExecutor] Registered object '{name}' at {position}")
+
+    def unregister_object(self, name: str):
+        """Remove an object from tracking."""
+        with self.lock:
+            if name in self.known_objects:
+                del self.known_objects[name]
+                if self.held_object == name:
+                    self.held_object = None
+
+    def get_objects(self) -> Dict[str, dict]:
+        """Get all known objects."""
+        with self.lock:
+            return self.known_objects.copy()
 
 
 # Singleton instance

@@ -108,10 +108,44 @@ Available Intents:
    Parameters: location_name (string)
    Examples: "save this as home", "remember this position as pickup"
 
+8. compound_command - Execute multiple commands in sequence
+   Parameters: sequence (list of {{"intent": "...", "params": {{}}}})
+   Examples:
+   - "move up and close gripper" -> [{{move_relative: up 1cm}}, {{gripper_close}}]
+   - "grab it and move left" -> [{{gripper_close}}, {{move_relative: left 1cm}}]
+   - "open gripper and go back" -> [{{gripper_open}}, {{move_to_previous}}]
+   Note: Break down compound commands into individual sequential intents
+
+9. move_to_object - Move to a known object's position
+   Parameters: object_name (string)
+   Examples: "go to the cube", "move to the box", "find the red block"
+
+10. pick_object - Pick up an object (move to it, close gripper)
+    Parameters: object_name (string)
+    Examples: "pick up the cube", "grab the box", "get the block"
+
+11. place_object - Place held object at location
+    Parameters: location (string or "here" for current position)
+    Examples: "place it here", "put it down", "drop the cube at home"
+
 Return ONLY a JSON object:
+
+For single intent:
 {{
   "intent": "intent_name",
   "params": {{}},
+  "confidence": 0.95
+}}
+
+For compound commands:
+{{
+  "intent": "compound_command",
+  "params": {{
+    "sequence": [
+      {{"intent": "move_relative", "params": {{"direction": "up", "distance": 1.0}}}},
+      {{"intent": "gripper_close", "params": {{}}}}
+    ]
+  }},
   "confidence": 0.95
 }}
 
@@ -120,6 +154,8 @@ Rules:
 - direction must be lowercase
 - If the command is gibberish, empty, or not a robot command, return confidence: 0.0
 - For commands like "I moved..." (past tense describing what happened), interpret as a command to move
+- Compound commands with "and" should use compound_command intent
+- For object manipulation, track which object is being referenced
 
 Command: "{voice_command}"
 
