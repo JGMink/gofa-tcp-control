@@ -338,7 +338,62 @@ class InstructionCompiler:
             lines.append("KNOWN RECIPES:")
             for name, info in recipes.items():
                 layers = " -> ".join(info.get("layers", []))
+                aliases = ", ".join(info.get("aliases", []))
                 lines.append(f"  - {name}: {layers}")
+                if aliases:
+                    lines.append(f"    aliases: {aliases}")
+
+        # Modifiers
+        modifiers = self.scene_context.get("modifiers", {})
+        if modifiers:
+            lines.append("")
+            lines.append("RECIPE MODIFIERS (how to modify a recipe based on user words):")
+            for name, info in modifiers.items():
+                examples = ", ".join(info.get("examples", []))
+                lines.append(f"  - \"{name}\": {info.get('description', '')} (e.g. {examples})")
+
+        # Speed modifiers
+        speed_mods = self.scene_context.get("speed_modifiers", {})
+        if speed_mods:
+            lines.append("")
+            lines.append("SPEED MODIFIERS:")
+            for level, info in speed_mods.items():
+                aliases = ", ".join(info.get("aliases", []))
+                lines.append(f"  - {level} ({info.get('multiplier', 1.0)}x): {aliases}")
+
+        # Constraints
+        constraints = self.scene_context.get("constraints", {})
+        if constraints:
+            lines.append("")
+            lines.append("CONSTRAINTS:")
+            lines.append(f"  - Max stack height: {constraints.get('max_stack_height', 8)} layers")
+            lines.append(f"  - Tile height: {constraints.get('tile_height_cm', 1.0)}cm per layer")
+
+        # Example script
+        lines.append("")
+        lines.append("EXAMPLE: 'make a classic sandwich on plate 1' produces this sequence:")
+        lines.append('  [')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "meat"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "lettuce"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "tomato"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
+        lines.append('    {"instruction": "serve", "params": {"plate": "plate_1"}},')
+        lines.append('    {"instruction": "go_home", "params": {}}')
+        lines.append('  ]')
+
+        lines.append("")
+        lines.append("EXAMPLE: 'make a BLT with double lettuce, no tomato, on plate 2, nice and neat' produces:")
+        lines.append('  [')
+        lines.append('    {"instruction": "set_speed", "params": {"speed": "slow"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "meat"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "lettuce"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "lettuce"}},')
+        lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
+        lines.append('    {"instruction": "serve", "params": {"plate": "plate_2"}},')
+        lines.append('    {"instruction": "go_home", "params": {}}')
+        lines.append('  ]')
 
         return "\n".join(lines)
 
@@ -512,26 +567,48 @@ class InstructionExecutor:
         time.sleep(seconds)
         return True
 
+    def _execute_set_speed(self, params: Dict) -> bool:
+        """
+        set_speed(speed) - Set robot movement speed.
+        Delegates to SandwichExecutor for the actual speed mapping logic.
+        """
+        try:
+            from .sandwich_executor import get_sandwich_executor
+            return get_sandwich_executor().execute_set_speed(params)
+        except ImportError:
+            print(f"    [EXEC] set_speed('{params.get('speed', 'normal')}') - stub, no sandwich executor")
+            return True
+
     # -------------------------------------------------------------------------
     # Main Execution
     # -------------------------------------------------------------------------
 
     def execute_step(self, step: ExecutionStep) -> bool:
-        """Execute a single step."""
+        """Execute a single step. Delegates to SandwichExecutor for sandwich-specific instructions."""
         executors = {
             "move_to": self._execute_move_to,
             "move_relative": self._execute_move_relative,
             "gripper_open": self._execute_gripper_open,
             "gripper_close": self._execute_gripper_close,
             "wait": self._execute_wait,
+            "set_speed": self._execute_set_speed,
         }
 
         executor = executors.get(step.instruction)
         if executor:
             return executor(step.params)
-        else:
-            print(f"[ERROR] No executor for primitive: {step.instruction}")
-            return False
+
+        # Delegate to SandwichExecutor for sandwich-level instructions
+        try:
+            from .sandwich_executor import get_sandwich_executor
+            sandwich_exec = get_sandwich_executor()
+            if sandwich_exec.can_handle(step.instruction):
+                return sandwich_exec.execute(step.instruction, step.params)
+        except ImportError:
+            pass
+
+        print(f"[ERROR] No executor for instruction: {step.instruction}")
+        return False
 
     def execute_plan(self, plan: ExecutionPlan) -> bool:
         """

@@ -1,47 +1,52 @@
 {
   "scene": {
     "name": "sandwich_assembly",
-    "description": "A workspace with ingredient stacks and an assembly zone for building sandwiches"
+    "description": "A three-zone workspace for sandwich assembly: ingredient tray, assembly fixture, and serving plates."
   },
   "items": {
     "bread": {
-      "description": "Sliced bread for sandwich base and top",
-      "stack_location": "bread_stack",
+      "description": "Bread tile (100x100x10mm PLA prop)",
+      "slot_location": "bread_slot",
       "properties": {
         "stackable": true,
-        "fragile": false
+        "fragile": false,
+        "tile_height_cm": 1.0
       }
     },
     "cheese": {
-      "description": "Cheese slice",
-      "stack_location": "cheese_stack",
+      "description": "Cheese tile (100x100x10mm PLA prop)",
+      "slot_location": "cheese_slot",
       "properties": {
         "stackable": true,
-        "fragile": false
+        "fragile": false,
+        "tile_height_cm": 1.0
       }
     },
     "lettuce": {
-      "description": "Lettuce leaf",
-      "stack_location": "lettuce_stack",
+      "description": "Lettuce tile (100x100x10mm PLA prop)",
+      "slot_location": "lettuce_slot",
       "properties": {
         "stackable": true,
-        "fragile": true
+        "fragile": true,
+        "tile_height_cm": 1.0
       }
     },
     "tomato": {
-      "description": "Tomato slice",
-      "stack_location": "tomato_stack",
+      "description": "Tomato tile (100x100x10mm PLA prop)",
+      "slot_location": "tomato_slot",
       "properties": {
         "stackable": true,
-        "fragile": true
+        "fragile": true,
+        "tile_height_cm": 1.0
       }
     },
     "meat": {
-      "description": "Deli meat slice",
-      "stack_location": "meat_stack",
+      "description": "Protein/meat tile (100x100x10mm PLA prop)",
+      "slot_location": "meat_slot",
       "properties": {
         "stackable": true,
-        "fragile": false
+        "fragile": false,
+        "tile_height_cm": 1.0
       }
     }
   },
@@ -49,72 +54,160 @@
     "home": {
       "description": "Robot home/starting position",
       "position": {"x": 0.0, "y": 0.567, "z": -0.24},
-      "type": "waypoint"
+      "type": "waypoint",
+      "zone": null
     },
-    "assembly_zone": {
-      "description": "Central area where sandwiches are assembled",
-      "position": {"x": 0.0, "y": 0.3, "z": 0.0},
-      "type": "workspace"
-    },
-    "bread_stack": {
-      "description": "Stack of bread slices",
+    "bread_slot": {
+      "description": "Bread tile slot in the ingredient tray",
       "position": {"x": -0.2, "y": 0.3, "z": 0.1},
-      "type": "item_stack",
+      "type": "ingredient_slot",
+      "zone": "ingredient",
       "item": "bread"
     },
-    "cheese_stack": {
-      "description": "Stack of cheese slices",
+    "cheese_slot": {
+      "description": "Cheese tile slot in the ingredient tray",
       "position": {"x": -0.1, "y": 0.3, "z": 0.1},
-      "type": "item_stack",
+      "type": "ingredient_slot",
+      "zone": "ingredient",
       "item": "cheese"
     },
-    "lettuce_stack": {
-      "description": "Stack of lettuce leaves",
+    "lettuce_slot": {
+      "description": "Lettuce tile slot in the ingredient tray",
       "position": {"x": 0.0, "y": 0.3, "z": 0.1},
-      "type": "item_stack",
+      "type": "ingredient_slot",
+      "zone": "ingredient",
       "item": "lettuce"
     },
-    "tomato_stack": {
-      "description": "Stack of tomato slices",
+    "tomato_slot": {
+      "description": "Tomato tile slot in the ingredient tray",
       "position": {"x": 0.1, "y": 0.3, "z": 0.1},
-      "type": "item_stack",
+      "type": "ingredient_slot",
+      "zone": "ingredient",
       "item": "tomato"
     },
-    "meat_stack": {
-      "description": "Stack of meat slices",
+    "meat_slot": {
+      "description": "Meat/protein tile slot in the ingredient tray",
       "position": {"x": 0.2, "y": 0.3, "z": 0.1},
-      "type": "item_stack",
+      "type": "ingredient_slot",
+      "zone": "ingredient",
       "item": "meat"
+    },
+    "assembly_fixture": {
+      "description": "Passive alignment fixture where the sandwich is stacked. Guide walls correct minor misalignment. Relief slots allow bottom-gripping the completed stack.",
+      "position": {"x": 0.0, "y": 0.3, "z": 0.0},
+      "type": "assembly",
+      "zone": "assembly"
+    },
+    "plate_1": {
+      "description": "Serving plate 1",
+      "position": {"x": -0.15, "y": 0.3, "z": -0.15},
+      "type": "serving_plate",
+      "zone": "serving"
+    },
+    "plate_2": {
+      "description": "Serving plate 2",
+      "position": {"x": 0.0, "y": 0.3, "z": -0.15},
+      "type": "serving_plate",
+      "zone": "serving"
+    },
+    "plate_3": {
+      "description": "Serving plate 3",
+      "position": {"x": 0.15, "y": 0.3, "z": -0.15},
+      "type": "serving_plate",
+      "zone": "serving"
     }
   },
   "state": {
     "gripper": "open",
     "holding": null,
     "assembly_stack": [],
-    "current_position": "home"
+    "assembly_stack_height": 0,
+    "current_position": "home",
+    "speed": "normal",
+    "plates": {
+      "plate_1": [],
+      "plate_2": [],
+      "plate_3": []
+    }
   },
   "recipes": {
+    "classic": {
+      "description": "Classic sandwich",
+      "layers": ["bread", "meat", "lettuce", "tomato", "bread"],
+      "aliases": ["classic sandwich", "regular", "standard", "normal sandwich"]
+    },
     "blt": {
       "description": "Bacon Lettuce Tomato sandwich",
       "layers": ["bread", "meat", "lettuce", "tomato", "bread"],
-      "notes": "Using deli meat as bacon substitute"
+      "aliases": ["BLT", "bacon lettuce tomato"],
+      "notes": "Using deli meat tile as bacon substitute"
     },
-    "cheese_sandwich": {
+    "cheese": {
       "description": "Simple cheese sandwich",
-      "layers": ["bread", "cheese", "bread"]
+      "layers": ["bread", "cheese", "bread"],
+      "aliases": ["cheese sandwich", "grilled cheese", "cheese only"]
+    },
+    "veggie": {
+      "description": "Vegetarian sandwich",
+      "layers": ["bread", "lettuce", "tomato", "cheese", "bread"],
+      "aliases": ["veggie", "vegetarian", "veggie sandwich", "garden sandwich"]
     },
     "club": {
       "description": "Club sandwich with everything",
-      "layers": ["bread", "meat", "cheese", "lettuce", "tomato", "bread"]
+      "layers": ["bread", "meat", "cheese", "lettuce", "tomato", "bread"],
+      "aliases": ["club sandwich", "the works", "everything", "loaded"]
+    }
+  },
+  "modifiers": {
+    "double": {
+      "description": "Add the specified ingredient twice instead of once",
+      "examples": ["double lettuce", "double cheese", "double meat"],
+      "action": "duplicate_layer"
+    },
+    "extra": {
+      "description": "Same as double - add the ingredient twice",
+      "examples": ["extra lettuce", "extra cheese"],
+      "action": "duplicate_layer"
+    },
+    "no": {
+      "description": "Remove the specified ingredient from the recipe",
+      "examples": ["no tomato", "hold the lettuce", "without cheese"],
+      "action": "remove_layer"
+    },
+    "hold": {
+      "description": "Same as no - remove the ingredient",
+      "examples": ["hold the tomato", "hold the lettuce"],
+      "action": "remove_layer"
+    },
+    "swap": {
+      "description": "Replace one ingredient with another",
+      "examples": ["swap cheese for extra meat", "replace tomato with lettuce"],
+      "action": "replace_layer"
+    }
+  },
+  "speed_modifiers": {
+    "slow": {"multiplier": 0.5, "aliases": ["slower", "careful", "gentle", "easy", "nice and neat"]},
+    "normal": {"multiplier": 1.0, "aliases": ["normal", "regular", "default"]},
+    "fast": {"multiplier": 1.5, "aliases": ["faster", "quick", "hurry", "speed up"]}
+  },
+  "constraints": {
+    "max_stack_height": 8,
+    "tile_height_cm": 1.0,
+    "max_tiles_per_ingredient": 5,
+    "workspace_bounds": {
+      "x_min": -0.3, "x_max": 0.3,
+      "y_min": 0.2, "y_max": 0.7,
+      "z_min": -0.3, "z_max": 0.2
     }
   },
   "meta": {
-    "version": "1.0",
+    "version": "2.0",
     "units": "meters for positions, Unity coordinate system",
     "notes": [
       "Positions are approximate - will be calibrated with actual robot",
-      "Stack heights will need dynamic tracking as items are moved",
-      "Assembly zone builds from bottom up"
+      "Tiles are 100x100x10mm rigid PLA/PETG props",
+      "Assembly fixture has guide walls and bottom relief slots",
+      "Stack height increments by tile_height_cm (1.0cm = 0.01 Unity units) per layer"
     ]
   }
 }

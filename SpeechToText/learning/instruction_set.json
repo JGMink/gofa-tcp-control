@@ -3,9 +3,9 @@
     "move_to": {
       "description": "Move the robot arm to a named location",
       "parameters": {
-        "location": "string - name of the target location"
+        "location": "string - name of the target location from the workspace map"
       },
-      "example": "move_to(\"cheese_stack\")"
+      "example": "move_to(\"cheese_slot\")"
     },
     "move_relative": {
       "description": "Move the robot arm relative to current position",
@@ -31,16 +31,23 @@
         "seconds": "float - time to wait"
       },
       "example": "wait(0.5)"
+    },
+    "set_speed": {
+      "description": "Set the robot movement speed multiplier",
+      "parameters": {
+        "speed": "string - one of: slow, normal, fast (maps to 0.5x, 1.0x, 1.5x multiplier)"
+      },
+      "example": "set_speed(\"slow\")"
     }
   },
   "composites": {
     "pick_up": {
-      "description": "Pick up an item from its location",
+      "description": "Pick up an item from its ingredient slot",
       "parameters": {
-        "item": "string - name of the item to pick up"
+        "item": "string - name of the item to pick up (bread, cheese, lettuce, tomato, meat)"
       },
       "sequence": [
-        {"instruction": "move_to", "params": {"location": "{item}_stack"}},
+        {"instruction": "move_to", "params": {"location": "{item}_slot"}},
         {"instruction": "gripper_close", "params": {}},
         {"instruction": "move_relative", "params": {"direction": "up", "distance": 5.0}}
       ],
@@ -48,7 +55,7 @@
       "confidence": 1.0
     },
     "place_at": {
-      "description": "Place the currently held item at a location",
+      "description": "Place the currently held item at a location, lowering to the correct height",
       "parameters": {
         "location": "string - name of the target location"
       },
@@ -62,7 +69,7 @@
       "confidence": 1.0
     },
     "transfer": {
-      "description": "Transfer an item from its stack to a destination",
+      "description": "Transfer an item from its ingredient slot to a destination",
       "parameters": {
         "item": "string - name of the item",
         "destination": "string - name of the destination location"
@@ -82,15 +89,66 @@
       ],
       "learned": false,
       "confidence": 1.0
+    },
+    "add_layer": {
+      "description": "Add one ingredient layer to the assembly fixture. Picks the item from its ingredient slot and places it at the assembly fixture, auto-calculating the drop-off height based on the current stack height (each layer = 1.0cm).",
+      "parameters": {
+        "item": "string - ingredient name (bread, cheese, lettuce, tomato, meat)"
+      },
+      "sequence": [
+        {"instruction": "pick_up", "params": {"item": "{item}"}},
+        {"instruction": "place_at", "params": {"location": "assembly_fixture"}}
+      ],
+      "notes": "The executor must adjust the place_at y-offset by (stack_height * 1.0cm) before placing. After placing, it increments the assembly stack height and appends the item to the assembly_stack list.",
+      "learned": false,
+      "confidence": 1.0
+    },
+    "serve": {
+      "description": "Pick up the completed sandwich stack from the assembly fixture and place it on a numbered serving plate.",
+      "parameters": {
+        "plate": "string - plate name (plate_1, plate_2, or plate_3)"
+      },
+      "sequence": [
+        {"instruction": "move_to", "params": {"location": "assembly_fixture"}},
+        {"instruction": "gripper_close", "params": {}},
+        {"instruction": "move_relative", "params": {"direction": "up", "distance": 5.0}},
+        {"instruction": "place_at", "params": {"location": "{plate}"}}
+      ],
+      "notes": "After serving, the executor resets the assembly_stack to [] and stack_height to 0.",
+      "learned": false,
+      "confidence": 1.0
+    },
+    "clear_assembly": {
+      "description": "Remove all items from the assembly fixture and return them to their ingredient slots. Used to start over or cancel a build.",
+      "parameters": {},
+      "sequence": [],
+      "notes": "The executor dynamically generates the sequence by iterating assembly_stack in reverse and transferring each item back to its slot.",
+      "learned": false,
+      "confidence": 1.0
+    },
+    "adjust_speed": {
+      "description": "Change robot speed using a qualitative modifier.",
+      "parameters": {
+        "modifier": "string - one of: slower, faster, careful, normal, quick, gentle"
+      },
+      "sequence": [
+        {"instruction": "set_speed", "params": {"speed": "{modifier}"}}
+      ],
+      "notes": "The executor maps qualitative words: slower/careful/gentle -> slow, normal -> normal, faster/quick -> fast.",
+      "learned": false,
+      "confidence": 1.0
     }
   },
   "meta": {
-    "version": "1.0",
-    "description": "Hierarchical instruction set for robot arm control. Primitives are atomic, composites are sequences of primitives or other composites.",
+    "version": "2.0",
+    "description": "Hierarchical instruction set for sandwich-building robot arm control. Primitives are atomic hardware operations. Composites are sequences of primitives or other composites. The LLM generates sequences of these instructions from natural language.",
     "notes": [
       "Parameters in sequences can use {param_name} for substitution",
       "Composites can call other composites (recursive expansion)",
-      "Learned composites have learned=true and confidence<1.0"
+      "Learned composites have learned=true and confidence<1.0",
+      "add_layer auto-calculates height offset from assembly stack state",
+      "serve resets assembly state after completion",
+      "clear_assembly is dynamically generated at runtime from current stack"
     ]
   }
 }

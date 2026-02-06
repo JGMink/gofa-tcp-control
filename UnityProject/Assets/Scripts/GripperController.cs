@@ -3,8 +3,9 @@ using System.IO;
 
 public class GripperController : MonoBehaviour
 {
-    [Header("Gripper Model Settings")]
     public enum GripperModel { RG2, RG6 }
+
+    [Header("Gripper Model Settings")]
     public GripperModel modelType = GripperModel.RG2;
 
     [Header("Finger Transforms")]
