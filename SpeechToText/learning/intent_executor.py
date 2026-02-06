@@ -410,31 +410,22 @@ class IntentExecutor:
     def _save_commands(self):
         """Save current command to the JSON file (single command mode)."""
         with self.lock:
-            # Single command mode: just save the latest position and gripper state
-            output = self.current_position.copy()  # Always include position
+            # Always save: current position + current gripper state
+            output = self.current_position.copy()
 
-            if self.command_queue:
-                latest = self.command_queue[-1]
-                if latest.get("command_type") == "move" and "position" in latest:
-                    output.update(latest["position"])
-                elif latest.get("command_type") == "gripper":
-                    # Convert gripper action to position value for Unity
-                    # RG2: 0.0 = fully closed, 0.11 = fully open
-                    gripper_pos = 0.11 if latest["action"] == "open" else 0.0
-                    output["gripper_position"] = gripper_pos
-                elif latest.get("command_type") == "emergency_halt":
-                    output["emergency_halt"] = True
+            # Always include current gripper state
+            gripper_pos = 0.11 if self.gripper_state == "open" else 0.0
+            output["gripper_position"] = gripper_pos
 
-            # Always include current gripper state as position
-            if "gripper_position" not in output:
-                gripper_pos = 0.11 if self.gripper_state == "open" else 0.0
-                output["gripper_position"] = gripper_pos
+            # Check for emergency halt
+            if self.command_queue and self.command_queue[-1].get("command_type") == "emergency_halt":
+                output["emergency_halt"] = True
 
             with open(self.command_queue_file, 'w') as f:
                 json.dump(output, f, indent=2)
 
         if VERBOSE_LOGGING:
-            print(f"[IntentExecutor] Saved to {self.command_queue_file}")
+            print(f"[IntentExecutor] Saved to {self.command_queue_file}: pos={self.current_position}, gripper={self.gripper_state}")
     
     def get_state(self) -> dict:
         """Get current state for LLM context."""
