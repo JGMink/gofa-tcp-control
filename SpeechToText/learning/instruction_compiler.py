@@ -83,12 +83,23 @@ class InstructionCompiler:
     # -------------------------------------------------------------------------
 
     def get_primitives(self) -> Dict:
-        """Get all primitive instructions."""
-        return self.instruction_set.get("primitives", {})
+        """Get all primitive instructions, excluding metadata keys."""
+        return {
+            k: v for k, v in self.instruction_set.get("primitives", {}).items()
+            if not k.startswith("_") and isinstance(v, dict)
+        }
 
     def get_composites(self) -> Dict:
-        """Get all composite instructions."""
-        return self.instruction_set.get("composites", {})
+        """Get all composite instructions, excluding metadata keys and learned composites."""
+        composites = {
+            k: v for k, v in self.instruction_set.get("composites", {}).items()
+            if not k.startswith("_") and isinstance(v, dict)
+        }
+        learned = {
+            k: v for k, v in self.instruction_set.get("learned_composites", {}).items()
+            if not k.startswith("_") and isinstance(v, dict)
+        }
+        return {**composites, **learned}
 
     def get_instruction(self, name: str) -> Optional[Dict]:
         """Get an instruction by name (primitive or composite)."""
@@ -286,112 +297,158 @@ class InstructionCompiler:
 
     def get_llm_context(self) -> str:
         """
-        Generate context string for LLM prompt.
-        Includes available instructions, items, locations, and state.
+        Generate context string for the sequence interpreter LLM prompt.
+        Only includes llm_visible instructions. Reads speed/distance params
+        from motion_params in scene_context (v3.0 schema).
         """
         lines = []
 
-        # Primitives
-        lines.append("PRIMITIVE INSTRUCTIONS (atomic operations):")
-        for name, info in self.get_primitives().items():
-            params = info.get("parameters", {})
-            param_str = ", ".join(f"{k}: {v}" for k, v in params.items()) if params else "none"
-            lines.append(f"  - {name}({param_str}): {info.get('description', '')}")
-
-        lines.append("")
-
-        # Composites
-        lines.append("COMPOSITE INSTRUCTIONS (can be used as single commands):")
+        # ── Composites (the only thing the LLM should call) ──────────────────
+        lines.append("AVAILABLE INSTRUCTIONS (call these by name in your sequence):")
         for name, info in self.get_composites().items():
+            if not info.get("llm_visible", True):
+                continue
             params = info.get("parameters", {})
-            param_str = ", ".join(params.keys()) if params else "none"
+            param_str = ", ".join(params.keys()) if params else ""
             learned = " [learned]" if info.get("learned") else ""
-            lines.append(f"  - {name}({param_str}): {info.get('description', '')}{learned}")
+            runtime = " [runtime]" if info.get("runtime") else ""
+            lines.append(f"  - {name}({param_str}): {info.get('description', '')}{runtime}{learned}")
 
         lines.append("")
 
-        # Items
-        lines.append("AVAILABLE ITEMS:")
+        # ── Items ─────────────────────────────────────────────────────────────
+        lines.append("AVAILABLE ITEMS (valid values for 'item' parameter):")
         for name, info in self.get_items().items():
-            lines.append(f"  - {name}: {info.get('description', '')} (at {info.get('stack_location', 'unknown')})")
+            if name.startswith("_"):
+                continue
+            fragile = " [fragile — prefer slow speed]" if info.get("properties", {}).get("fragile") else ""
+            lines.append(f"  - {name}{fragile}")
 
         lines.append("")
 
-        # Locations
-        lines.append("NAMED LOCATIONS:")
+        # ── Locations ─────────────────────────────────────────────────────────
+        lines.append("NAMED LOCATIONS (valid values for 'location' parameter):")
         for name, info in self.get_locations().items():
+            if name.startswith("_"):
+                continue
             lines.append(f"  - {name}: {info.get('description', '')}")
 
         lines.append("")
 
-        # Current state
+        # ── Current state ─────────────────────────────────────────────────────
         state = self.get_state()
-        lines.append("CURRENT STATE:")
-        lines.append(f"  - Gripper: {state.get('gripper', 'unknown')}")
-        lines.append(f"  - Holding: {state.get('holding', 'nothing')}")
-        lines.append(f"  - Assembly stack: {state.get('assembly_stack', [])}")
+        gripper = state.get("gripper", "open")
+        holding = state.get("holding") or "nothing"
+        speed = state.get("speed", "normal")
 
-        # Recipes (for sandwich context)
+        # Stack state — v3.0 uses state.stacks dict
+        stacks = state.get("stacks", {})
+        stack_lines = []
+        if stacks:
+            for zone, sdata in stacks.items():
+                if isinstance(sdata, dict):
+                    items = sdata.get("items", [])
+                    height = sdata.get("height", len(items))
+                    constraints = self.scene_context.get("constraints", {})
+                    max_h = constraints.get("max_stack_height", 8)
+                    status = "FULL" if height >= max_h else ("occupied" if items else "empty")
+                    stack_lines.append(f"      {zone}: {items} ({status}, height {height}/{max_h})")
+        else:
+            # fallback for old schema
+            fallback = state.get("assembly_stack", [])
+            stack_lines.append(f"      assembly_fixture: {fallback}")
+        stack_str = "\n".join(stack_lines) if stack_lines else "      (none)"
+
+        active_zone = state.get("active_zone", "assembly_fixture")
+        lines.append("CURRENT STATE:")
+        lines.append(f"  - Gripper: {gripper}")
+        lines.append(f"  - Holding: {holding}")
+        lines.append(f"  - Speed: {speed}")
+        lines.append(f"  - Active zone: {active_zone}")
+        lines.append(f"  - Assembly zones:")
+        lines.append(stack_str)
+
+        lines.append("")
+
+        # ── Speed aliases ─────────────────────────────────────────────────────
+        motion = self.scene_context.get("motion_params", {})
+        speed_profiles = motion.get("speed_profiles", {})
+        if not speed_profiles:
+            # fallback for old schema
+            speed_profiles = self.scene_context.get("speed_modifiers", {})
+        if speed_profiles:
+            lines.append("SPEED WORDS (use with adjust_speed):")
+            for level, info in speed_profiles.items():
+                if isinstance(info, dict):
+                    aliases = ", ".join(info.get("aliases", [level]))
+                    lines.append(f"  - \"{level}\": {aliases}")
+            lines.append("")
+
+        # ── Recipes ───────────────────────────────────────────────────────────
         recipes = self.scene_context.get("recipes", {})
         if recipes:
-            lines.append("")
             lines.append("KNOWN RECIPES:")
             for name, info in recipes.items():
-                layers = " -> ".join(info.get("layers", []))
+                if name.startswith("_") or not isinstance(info, dict):
+                    continue
+                layers = " → ".join(info.get("layers", []))
                 aliases = ", ".join(info.get("aliases", []))
                 lines.append(f"  - {name}: {layers}")
                 if aliases:
-                    lines.append(f"    aliases: {aliases}")
+                    lines.append(f"    also called: {aliases}")
+            lines.append("")
 
-        # Modifiers
+        # ── Modifiers ─────────────────────────────────────────────────────────
         modifiers = self.scene_context.get("modifiers", {})
         if modifiers:
-            lines.append("")
-            lines.append("RECIPE MODIFIERS (how to modify a recipe based on user words):")
-            for name, info in modifiers.items():
+            lines.append("RECIPE MODIFIERS:")
+            for word, info in modifiers.items():
+                if word.startswith("_") or not isinstance(info, dict):
+                    continue
                 examples = ", ".join(info.get("examples", []))
-                lines.append(f"  - \"{name}\": {info.get('description', '')} (e.g. {examples})")
-
-        # Speed modifiers
-        speed_mods = self.scene_context.get("speed_modifiers", {})
-        if speed_mods:
+                lines.append(f"  - \"{word}\": {info.get('description', '')}  e.g. {examples}")
             lines.append("")
-            lines.append("SPEED MODIFIERS:")
-            for level, info in speed_mods.items():
-                aliases = ", ".join(info.get("aliases", []))
-                lines.append(f"  - {level} ({info.get('multiplier', 1.0)}x): {aliases}")
 
-        # Constraints
+        # ── Constraints ───────────────────────────────────────────────────────
         constraints = self.scene_context.get("constraints", {})
         if constraints:
-            lines.append("")
             lines.append("CONSTRAINTS:")
             lines.append(f"  - Max stack height: {constraints.get('max_stack_height', 8)} layers")
-            lines.append(f"  - Tile height: {constraints.get('tile_height_cm', 1.0)}cm per layer")
+            tile_h = motion.get("defaults", {}).get("tile_height_cm",
+                     constraints.get("tile_height_cm", 1.0))
+            lines.append(f"  - Each tile = {tile_h}cm height")
+            lines.append("")
 
-        # Example script
-        lines.append("")
-        lines.append("EXAMPLE: 'make a classic sandwich on plate 1' produces this sequence:")
+        # ── Learned composites summary (names only) ───────────────────────────
+        learned = {
+            k: v for k, v in self.instruction_set.get("learned_composites", {}).items()
+            if not k.startswith("_") and isinstance(v, dict)
+        }
+        if learned:
+            lines.append("ALREADY LEARNED (call by name — do not redefine):")
+            for name, info in learned.items():
+                lines.append(f"  - {name}: {info.get('description', '')}")
+            lines.append("")
+
+        # ── Canonical examples ────────────────────────────────────────────────
+        lines.append("EXAMPLE — \"make a classic sandwich\":")
         lines.append('  [')
         lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "meat"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "lettuce"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "tomato"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
-        lines.append('    {"instruction": "serve", "params": {"plate": "plate_1"}},')
         lines.append('    {"instruction": "go_home", "params": {}}')
         lines.append('  ]')
-
         lines.append("")
-        lines.append("EXAMPLE: 'make a BLT with double lettuce, no tomato, on plate 2, nice and neat' produces:")
+        lines.append("EXAMPLE — \"BLT, nice and slow, double lettuce, no tomato\":")
         lines.append('  [')
-        lines.append('    {"instruction": "set_speed", "params": {"speed": "slow"}},')
+        lines.append('    {"instruction": "adjust_speed", "params": {"modifier": "slow"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "meat"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "lettuce"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "lettuce"}},')
         lines.append('    {"instruction": "add_layer", "params": {"item": "bread"}},')
-        lines.append('    {"instruction": "serve", "params": {"plate": "plate_2"}},')
         lines.append('    {"instruction": "go_home", "params": {}}')
         lines.append('  ]')
 

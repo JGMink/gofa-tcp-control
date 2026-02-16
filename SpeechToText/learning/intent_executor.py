@@ -32,7 +32,8 @@ class IntentExecutor:
         self.max_history = 50
         
         # Gripper state
-        self.gripper_state = "open"  # "open", "closed", "unknown"
+        self.gripper_state = "open"  # "open", "closed", "partial", "unknown"
+        self.gripper_position = 0.11  # Position in meters (0.0 = closed, 0.11 = fully open)
 
         # Object tracking
         self.known_objects: Dict[str, dict] = {}  # object_name -> {position, held, properties}
@@ -219,26 +220,48 @@ class IntentExecutor:
         """Open the gripper."""
         with self.lock:
             self.gripper_state = "open"
-        
+            self.gripper_position = 0.11  # 110mm fully open
+
         if VERBOSE_LOGGING:
-            print("[IntentExecutor] Gripper: OPEN")
-        
+            print("[IntentExecutor] Gripper: OPEN (110mm)")
+
         return {
             "command_type": "gripper",
-            "action": "open"
+            "action": "open",
+            "position": 0.11
         }
-    
+
     def _handle_gripper_close(self, params: dict) -> Optional[dict]:
-        """Close the gripper."""
+        """Close the gripper with optional target position."""
+        # Check for specific position
+        target_mm = params.get("distance_mm")
+        target_width = params.get("width_mm")
+
+        if target_mm is not None:
+            # Specific position in mm (e.g., "close to 50mm")
+            position = min(max(target_mm / 1000.0, 0.0), 0.11)
+            state = "partial"
+        elif target_width is not None:
+            # Close to specific width (e.g., for object handle)
+            position = min(max(target_width / 1000.0, 0.0), 0.11)
+            state = "partial"
+        else:
+            # Fully closed
+            position = 0.0
+            state = "closed"
+
         with self.lock:
-            self.gripper_state = "closed"
-        
+            self.gripper_state = state
+            self.gripper_position = position
+
         if VERBOSE_LOGGING:
-            print("[IntentExecutor] Gripper: CLOSE")
-        
+            print(f"[IntentExecutor] Gripper: CLOSE to {position*1000:.1f}mm")
+
         return {
             "command_type": "gripper",
-            "action": "close"
+            "action": "close",
+            "position": position,
+            "position_mm": position * 1000
         }
     
     def _handle_emergency_stop(self, params: dict) -> Optional[dict]:
@@ -413,8 +436,13 @@ class IntentExecutor:
             # Always save: current position + current gripper state
             output = self.current_position.copy()
 
-            # Always include current gripper state
-            gripper_pos = 0.11 if self.gripper_state == "open" else 0.0
+            # Use actual gripper position if set, otherwise use state-based default
+            if hasattr(self, 'gripper_position'):
+                gripper_pos = self.gripper_position
+            else:
+                # Fallback to old behavior for backward compatibility
+                gripper_pos = 0.11 if self.gripper_state == "open" else 0.0
+
             output["gripper_position"] = gripper_pos
 
             # Check for emergency halt
@@ -425,7 +453,7 @@ class IntentExecutor:
                 json.dump(output, f, indent=2)
 
         if VERBOSE_LOGGING:
-            print(f"[IntentExecutor] Saved to {self.command_queue_file}: pos={self.current_position}, gripper={self.gripper_state}")
+            print(f"[IntentExecutor] Saved to {self.command_queue_file}: pos={self.current_position}, gripper={gripper_pos*1000:.1f}mm")
     
     def get_state(self) -> dict:
         """Get current state for LLM context."""

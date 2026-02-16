@@ -4,12 +4,28 @@ Sequence Interpreter - LLM-based natural language to instruction sequence compil
 Uses Claude to interpret voice commands and generate instruction sequences
 that can be compiled and executed by the InstructionCompiler.
 
-This is the "brain" that understands natural language and maps it to
-the hierarchical instruction set.
+Architecture: three-pass pipeline
+  Pass 1 — Generation (temperature 0, or 1.0 for creative commands)
+  Pass 2 — Validation (check instruction names, params, fix or remove bad steps)
+  Pass 3 — Regeneration (if validator found issues, feed them back to generator for one retry)
+
+Result dict always contains:
+  interpretation      str   — what the LLM understood
+  sequence            list  — list of instruction steps (may be empty)
+  composite_name      str|null
+  confidence          float
+  validated           bool
+  validation_issues   list
+  user_feedback       str|null — message to show/speak to user for impossible commands
+  is_creative         bool — True if this was a creative/open-ended command
+  creative_reasoning  str|null — LLM's reasoning for creative choices (creative only)
+  pass1_sequence      list — raw Pass 1 sequence before validation (for display)
+  raw_response        str|null — raw LLM text if JSON parse failed
 """
 
 import json
 import os
+import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -21,6 +37,72 @@ except ImportError:
 
 from .config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, LLM_CONFIDENCE_THRESHOLD
 from .instruction_compiler import get_compiler, get_executor, InstructionCompiler
+
+
+# ── Creative command detection ─────────────────────────────────────────────────
+_CREATIVE_PATTERNS = [
+    r"\bimpress\b", r"\bgo wild\b", r"\bsurprise\b", r"\bcreative\b",
+    r"\bbeautiful\b", r"\bwork of art\b", r"\bwork of art\b",
+    r"\bbuild a tower\b", r"\bbest .* can\b", r"\bsomething delicious\b",
+    r"\bsomething interesting\b", r"\bmake it interesting\b",
+    r"\bsomething beautiful\b", r"\bmake me something\b",
+    r"\bdo something\b", r"\bgo crazy\b", r"\bhave fun\b",
+    r"\bfancy\b", r"\belaborate\b",
+]
+
+def _is_creative(command: str) -> bool:
+    cmd = command.lower()
+    return any(re.search(p, cmd) for p in _CREATIVE_PATTERNS)
+
+
+# Axis pairs that are logically contradictory — never assign these together.
+# palindrome requires a symmetric structure; random_ordered/full_set/category_grouped
+# all imply asymmetric orderings that can't be palindromic.
+_INCOMPATIBLE_PAIRS = {
+    "palindrome": {"random_ordered", "category_grouped", "full_set"},
+    "inverted":   {"all_one"},          # inverting one repeated ingredient = same thing
+    "single_short": {"all_one"},         # 2-3 layers of one item is fine actually — remove this if desired
+}
+
+def _compatible_axes(axis1: str, axis2: str) -> bool:
+    blocked = _INCOMPATIBLE_PAIRS.get(axis1, set())
+    return axis2 not in blocked
+
+
+def _collapse_unescaped_newlines(text: str) -> str:
+    """
+    Fix JSON where the LLM wrote literal newlines inside string values.
+    Walks character by character; inside a JSON string, replaces bare \n with \\n.
+    Handles escaped quotes (\") correctly.
+    """
+    result = []
+    in_string = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '\\' and in_string:
+            # Escaped character — pass both chars through unchanged
+            result.append(ch)
+            i += 1
+            if i < len(text):
+                result.append(text[i])
+            i += 1
+            continue
+        if ch == '"':
+            in_string = not in_string
+            result.append(ch)
+            i += 1
+            continue
+        if ch == '\n' and in_string:
+            result.append('\\n')
+            i += 1
+            continue
+        if ch == '\r' and in_string:
+            i += 1
+            continue
+        result.append(ch)
+        i += 1
+    return ''.join(result)
 
 
 class SequenceInterpreter:
@@ -39,74 +121,205 @@ class SequenceInterpreter:
         self.model = ANTHROPIC_MODEL
         self.compiler = compiler or get_compiler()
 
-    def _build_prompt(self, voice_command: str) -> str:
-        """Build the LLM prompt with full instruction set context."""
+    # ══════════════════════════════════════════════════════════════════════════
+    # PROMPT BUILDERS
+    # ══════════════════════════════════════════════════════════════════════════
 
+    def _build_prompt(self, voice_command: str, is_creative: bool = False,
+                      correction_hints: List[str] = None) -> str:
+        """
+        Build the sequence generation prompt.
+        - is_creative: tells the LLM it has full creative latitude
+        - correction_hints: Pass 3 — list of issues from validator to fix
+        """
         context = self.compiler.get_llm_context()
 
-        prompt = f"""You are a robot arm controller. Convert voice commands into instruction sequences.
+        correction_section = ""
+        if correction_hints:
+            hints_str = "\n".join(f"  - {h}" for h in correction_hints)
+            correction_section = f"""
+━━━ CORRECTION REQUIRED (Pass 3) ━━━
+Your previous response had these problems that the validator caught:
+{hints_str}
+
+Please regenerate a corrected sequence that fixes ALL of these issues.
+Use ONLY valid instruction names from the list above. Do not invent new ones.
+
+"""
+
+        creative_section = ""
+        if is_creative:
+            import random as _r
+            _axis1_options = [
+                ("single_tall",       "one zone only — stack as many layers as possible, no cap"),
+                ("single_short",      "one zone only — exactly 2 or 3 layers, stop there, negative space is the point"),
+                ("three_zone_split",  "use all three zones: set_active_zone(assembly_left), build, set_active_zone(assembly_fixture), build, set_active_zone(assembly_right), build"),
+                ("two_zone_contrast", "use exactly two zones with opposing ingredient sets — set_active_zone to switch between them"),
+                ("palindrome",        "one zone — the ingredient sequence must read IDENTICALLY forwards and backwards. Write it out letter by letter to verify before finalising. e.g. bread,meat,cheese,meat,bread or lettuce,tomato,lettuce"),
+                ("inverted",          "one zone — place ingredients in REVERSE of conventional sandwich order. Normally: bread,meat,cheese,veg,bread. Inverted: lettuce,tomato,cheese,meat,bread. Top ingredient first, bread absolutely last"),
+            ]
+            _axis2_options = [
+                ("all_one",          "choose exactly ONE ingredient and repeat it 4–6 times. Use nothing else."),
+                ("category_grouped", "group by food category: all proteins (meat) first, then all vegetables (lettuce, tomato), then all starch/dairy (bread, cheese)"),
+                ("full_set",         "use every available ingredient at least once: bread, meat, cheese, lettuce, tomato. Order them unusually."),
+                ("random_ordered",   "use all ingredients but in a non-obvious, surprising order — NOT bread-first or bread-last"),
+                ("doubled",          "pick exactly TWO ingredients and alternate them: A,B,A,B,A,B. Nothing else."),
+            ]
+            # Force ingredient constraint if command names specific items
+            _cmd_lower = voice_command.lower()
+            _named = [i for i in ["bread","meat","cheese","lettuce","tomato"] if i in _cmd_lower]
+            if _named:
+                _axis2_choice, _axis2_desc = ("constrained", f"use ONLY these named ingredients: {_named}. Repeat them, alternate them, stack them — but add nothing else.")
+                _axis1_choice, _axis1_desc = _r.choice(_axis1_options)
+            else:
+                # Pick compatible pair — retry until valid (max 10 attempts)
+                for _ in range(10):
+                    _axis1_choice, _axis1_desc = _r.choice(_axis1_options)
+                    _axis2_choice, _axis2_desc = _r.choice(_axis2_options)
+                    if _compatible_axes(_axis1_choice, _axis2_choice):
+                        break
+
+            creative_section = f"""
+━━━ CREATIVE MODE — AXES ━━━
+This is a creative/open-ended command. Do NOT produce a standard sandwich (bread-filling-bread).
+
+YOUR ASSIGNED COMBINATION FOR THIS COMMAND:
+
+  AXIS 1 (spatial structure): {_axis1_choice}
+  → {_axis1_desc}
+
+  AXIS 2 (ingredient logic): {_axis2_choice}
+  → {_axis2_desc}
+
+You MUST follow both axes literally when building the sequence.
+Do not override them. Do not revert to a standard sandwich shape.
+
+Axis 1 construction rules:
+- single_tall: keep adding layers until you would exceed stack capacity. No go_home until the stack is tall.
+- single_short: stop at exactly 2 or 3 layers. Resist the urge to add more.
+- three_zone_split: you MUST call set_active_zone() three times, once per zone.
+- two_zone_contrast: you MUST call set_active_zone() twice. Each zone gets a distinct ingredient set.
+- palindrome: write out your planned sequence first in creative_reasoning, verify it reads the same backwards, THEN generate the JSON steps. If it's not symmetric, fix it before outputting.
+- inverted: the LAST step before go_home() must be add_layer(bread). Bread goes last.
+
+Speed (adjust_speed) is expressive punctuation — use it to add drama, contrast, or rhythm. Optional but encouraged.
+
+In creative_reasoning: state "Axis 1: {_axis1_choice} × Axis 2: {_axis2_choice}" then explain the sequence you built.
+Set composite_name to null. Always produce a non-empty sequence.
+"""
+
+        prompt = f"""You are the instruction generator for an ABB GoFa robot arm that builds sandwich assemblies.
+Your job: convert a voice command into a JSON sequence of robot instructions.
 
 {context}
+{correction_section}
+━━━ OUTPUT FORMAT ━━━
+Return ONLY a JSON object — no explanation, no prose, no markdown fences. Just JSON.
 
-OUTPUT FORMAT:
-Return a JSON object with:
 {{
-  "interpretation": "brief description of what the command means",
+  "interpretation": "one sentence: what this command means in robot terms",
   "sequence": [
     {{"instruction": "instruction_name", "params": {{"param": "value"}}}},
     ...
   ],
-  "composite_name": "optional_name_for_this_sequence",
-  "confidence": 0.95
+  "composite_name": "snake_case_name_if_reusable_else_null",
+  "confidence": 0.95,
+  "user_feedback": null,
+  "creative_reasoning": null
 }}
 
-RULES:
-1. Use ONLY instructions from the lists above (primitives or composites)
-2. For composites, just use them directly - they'll be expanded automatically
-3. If a command matches an existing composite, just use that composite
-4. For new multi-step tasks, generate a sequence of primitives/composites
-5. Parameter substitution: use actual values, not placeholders
-6. confidence: 0.9-1.0 for clear commands, 0.7-0.9 for interpreted, <0.7 for unclear
-7. composite_name: suggest a name if this could be a reusable sequence (e.g., "make_blt")
+━━━ RULES ━━━
+1. Use ONLY instructions listed in AVAILABLE INSTRUCTIONS — never invent new ones like move_absolute
+2. For assembly, ALWAYS use add_layer — never transfer or place_at — when adding to a zone
+3. Every complete assembly sequence ends with go_home()
+4. Parameters must be actual values — never placeholders like {{item}}
+5. confidence: 0.9–1.0 clear · 0.7–0.9 interpreted · 0.5–0.7 best-guess · <0.5 very unclear
+6. Always produce a sequence even for unclear commands — make your best interpretation
+7. composite_name: snake_case reusable name if this is worth saving, else null. NEVER set for creative commands.
+8. For fragile items (lettuce, tomato), prepend adjust_speed("slow") unless already slow
+9. MULTI-ZONE: When building in a non-default zone, call set_active_zone("zone") FIRST, then add_layer calls.
+   Zone names: assembly_fixture (default/center), assembly_left, assembly_right
+   Spatial words: "left" → assembly_left, "right" → assembly_right, "center"/"middle" → assembly_fixture
+   "over there" / no specifier → use assembly_fixture (default)
+10. Bread can go ANYWHERE in a stack — it is not required only at the ends. Treat it like any other ingredient.
 
-EXAMPLES:
+━━━ CREATIVE COMMANDS ━━━
+If the command is open-ended ("impress me", "go wild", "make something beautiful",
+"build a tower", "surprise me", "do something", "make it interesting") — this is PERMISSION
+to do something genuinely surprising. IMPORTANT: do NOT produce a standard sandwich.
+Standard = bread, filling, bread. That is the boring answer.
+See CREATIVE MODE — AXES section above: pick one from Axis 1 (spatial structure)
+and one from Axis 2 (ingredient logic), combine them, explain both choices.
+Always set composite_name to null. Always include creative_reasoning.
+{creative_section}
+━━━ RECOVERY COMMANDS ━━━
+"put it back" / "undo" → return_to_stack() (no-op if not holding — safe to call always)
+"start over" / "never mind" / "cancel" → clear_assembly() then go_home()
+"take the [item] off" → return_to_stack() as best approximation (note: partial undo not yet supported)
+"I made a mistake" → return_to_stack() if holding, else clear_assembly()
+
+━━━ SPEED + ACTION COMBINED ━━━
+"carefully pick up X" → adjust_speed("slow") then pick_up(X)
+"do it faster" / "speed up" → adjust_speed("fast") with no other action
+"gently" / "nice and slow" / "take your time" → adjust_speed("slow") prepended to sequence
+
+━━━ UNKNOWN / IMPOSSIBLE COMMANDS ━━━
+If a command references an item NOT in the available items list (e.g. avocado, pickles, ham):
+- Set sequence to []
+- Set confidence to 0.1
+- Set user_feedback to a friendly message explaining what's not available and what IS available
+- Example: "I don't have avocado — available ingredients are: bread, meat, cheese, lettuce, tomato"
+
+If a command is physically impossible or makes no sense:
+- Set confidence low (< 0.4)
+- Set user_feedback explaining the issue
+- Still try to produce the closest valid sequence if possible
+
+━━━ SECONDARY / LEARNING COMMANDS ━━━
+If the command tries to define a new mapping ("make a BLT every time I say sandwich",
+"remember this as my usual", "call it X"):
+- Produce the sequence for the underlying action
+- Set composite_name to the requested name
+- Set user_feedback to "Mapping/composite noted — will be saved to memory system"
+- These will be handled by the memory writer downstream
+
+━━━ EXAMPLES ━━━
 
 Command: "pick up the cheese"
-{{
-  "interpretation": "Pick up cheese from its stack",
-  "sequence": [{{"instruction": "pick_up", "params": {{"item": "cheese"}}}}],
-  "composite_name": null,
-  "confidence": 0.95
-}}
-
-Command: "put the tomato in the assembly zone"
-{{
-  "interpretation": "Transfer tomato to assembly zone",
-  "sequence": [{{"instruction": "transfer", "params": {{"item": "tomato", "destination": "assembly_zone"}}}}],
-  "composite_name": null,
-  "confidence": 0.95
-}}
+{{"interpretation": "Pick up cheese from its slot", "sequence": [{{"instruction": "pick_up", "params": {{"item": "cheese"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
 
 Command: "make a cheese sandwich"
-{{
-  "interpretation": "Build a cheese sandwich: bread, cheese, bread",
-  "sequence": [
-    {{"instruction": "transfer", "params": {{"item": "bread", "destination": "assembly_zone"}}}},
-    {{"instruction": "transfer", "params": {{"item": "cheese", "destination": "assembly_zone"}}}},
-    {{"instruction": "transfer", "params": {{"item": "bread", "destination": "assembly_zone"}}}},
-    {{"instruction": "go_home", "params": {{}}}}
-  ],
-  "composite_name": "make_cheese_sandwich",
-  "confidence": 0.90
-}}
+{{"interpretation": "Build cheese sandwich: bread, cheese, bread", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_cheese_sandwich", "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
 
-Command: "move right a little bit"
-{{
-  "interpretation": "Move right by a small amount (0.5cm)",
-  "sequence": [{{"instruction": "move_relative", "params": {{"direction": "right", "distance": 0.5}}}}],
-  "composite_name": null,
-  "confidence": 0.95
-}}
+Command: "make a cheese sandwich on the left and a BLT on the right"
+{{"interpretation": "Build cheese sandwich at left zone, then BLT at right zone", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "impress me"
+{{"interpretation": "inverted structure, full ingredient set — upside-down sandwich built tall", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.85, "user_feedback": null, "creative_reasoning": "Axis 1: inverted — started with what normally goes on top, ended with bread at the bottom. Axis 2: full_set — every ingredient used once. The inversion makes structural logic visible. Slow speed because this is deliberate, not accidental."}}
+
+Command: "build a tower"
+{{"interpretation": "single tall structure, one ingredient only — bread monolith", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: single_tall — maximize height in one zone. Axis 2: all_one — bread only. A tower is a structural thing, not a food thing. Speed alternates slow/fast between layers for comedic rhythmic drama."}}
+
+Command: "do something with the lettuce and tomato"
+{{"interpretation": "two-zone contrast, constrained to named ingredients only", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: two_zone_contrast — lettuce gets the left zone, tomato gets the right, each built independently. Axis 2: constrained — only the two named ingredients, nothing else added. The contrast is the point: slow careful lettuce tower vs fast stacked tomato tower side by side."}}
+
+Command: "start over"
+{{"interpretation": "Clear the assembly and return home", "sequence": [{{"instruction": "clear_assembly", "params": {{}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "put it back"
+{{"interpretation": "Return held item to its slot (no-op if not holding)", "sequence": [{{"instruction": "return_to_stack", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "do it faster"
+{{"interpretation": "Increase robot speed", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "carefully pick up the lettuce"
+{{"interpretation": "Set slow speed then pick up lettuce", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "pick_up", "params": {{"item": "lettuce"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "pick up the avocado"
+{{"interpretation": "Avocado not available in the system", "sequence": [], "composite_name": null, "confidence": 0.1, "user_feedback": "I don't have avocado — available ingredients are: bread, meat, cheese, lettuce, tomato", "creative_reasoning": null}}
+
+Command: "make a BLT every time I say sandwich"
+{{"interpretation": "Define BLT as the default sandwich mapping", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_blt", "confidence": 0.9, "user_feedback": "Mapping noted — 'sandwich' will be saved as an alias for make_blt", "creative_reasoning": null}}
 
 Now interpret this command:
 
@@ -116,56 +329,255 @@ JSON:"""
 
         return prompt
 
+    def _build_validation_prompt(self, voice_command: str, raw_sequence: List[Dict],
+                                  interpretation: str) -> str:
+        """
+        Build the validation prompt for Pass 2.
+        Checks that the generated sequence only uses real instructions with valid params.
+        """
+        valid_composites = list(self.compiler.get_composites().keys())
+        valid_items = list(self.compiler.get_items().keys())
+        valid_locations = list(self.compiler.get_locations().keys())
+
+        prompt = f"""You are a robot instruction validator. A sequence was generated for a voice command.
+Your job: check it and return a corrected version if needed. Return ONLY JSON — no prose.
+
+VOICE COMMAND: "{voice_command}"
+INTERPRETATION: "{interpretation}"
+
+VALID INSTRUCTIONS: {valid_composites}
+VALID ITEMS: {valid_items}
+VALID LOCATIONS: {valid_locations}
+
+GENERATED SEQUENCE:
+{json.dumps(raw_sequence, indent=2)}
+
+VALIDATION RULES:
+1. Every "instruction" value must be in VALID INSTRUCTIONS — fix or remove if not
+   (e.g. move_absolute is NOT valid — remove it or replace with move_relative)
+2. Every "item" param must be in VALID ITEMS — remove steps with unknown items
+3. Every "location" param must be in VALID LOCATIONS — fix or remove if not
+4. move_relative direction must be one of: right, left, up, down, forward, backward
+5. Assembly sequences must use add_layer, not transfer or place_at
+6. set_active_zone zone must be one of: assembly_fixture, assembly_left, assembly_right
+7. Do NOT change the intent — only fix invalid instruction/param names
+8. If a step is unfixable, remove it
+9. If the sequence is empty after fixes, return an empty sequence (do not invent steps)
+
+Return this JSON:
+{{
+  "valid": true/false,
+  "issues": ["list of what was wrong, empty if none"],
+  "sequence": [corrected sequence here]
+}}
+
+JSON:"""
+        return prompt
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # JSON PARSING
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _parse_json_response(self, text: str) -> Optional[Dict]:
+        """
+        Robustly parse a JSON response from the LLM.
+        Handles: markdown fences, leading prose, trailing content,
+        and unescaped literal newlines inside JSON string values
+        (which the LLM produces in multiline creative_reasoning fields).
+        """
+        # Strip markdown fences
+        if "```" in text:
+            lines = text.split("\n")
+            text = "\n".join(l for l in lines if not l.startswith("```"))
+
+        text = text.strip()
+
+        # Try direct parse first
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Find first { ... } block
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+
+        candidate = text[start:end + 1]
+
+        # Try the block as-is
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+        # The LLM sometimes writes multiline strings in JSON without escaping
+        # the newlines — fix by collapsing literal newlines inside string values.
+        # Strategy: replace \n that appear between quotes with \\n, carefully.
+        # Use a simple state machine rather than regex to avoid breaking JSON structure.
+        fixed = _collapse_unescaped_newlines(candidate)
+        try:
+            return json.loads(fixed)
+        except json.JSONDecodeError:
+            pass
+
+        return None
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # MAIN INTERPRET
+    # ══════════════════════════════════════════════════════════════════════════
+
     def interpret(self, voice_command: str) -> Optional[Dict]:
         """
-        Interpret a voice command and return structured result.
+        Three-pass pipeline:
+          Pass 1 — Generation (temperature 1.0 for creative, 0 otherwise)
+          Pass 2 — Validation (fix invalid instruction/param names)
+          Pass 3 — Regeneration (if validator found issues, retry with hints)
 
-        Returns:
-            Dict with interpretation, sequence, composite_name, confidence
-            or None if interpretation failed
+        Returns None only for empty/trivial input.
+        Always returns a structured dict otherwise — never silently drops a result.
         """
         if not voice_command or len(voice_command.strip()) < 2:
             return None
 
-        try:
-            prompt = self._build_prompt(voice_command)
+        creative = _is_creative(voice_command)
+        temperature = 1.0 if creative else 0
 
+        # ── Pass 1: Generation ────────────────────────────────────────────────
+        raw_response_text = ""
+        try:
+            prompt = self._build_prompt(voice_command, is_creative=creative)
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=500,
-                temperature=0,
+                max_tokens=900,
+                temperature=temperature,
                 messages=[{"role": "user", "content": prompt}]
             )
-
-            response_text = response.content[0].text.strip()
-
-            # Handle markdown code blocks
-            if response_text.startswith("```"):
-                lines = response_text.split("\n")
-                json_lines = [l for l in lines if l and not l.startswith("```")]
-                response_text = "\n".join(json_lines)
-
-            result = json.loads(response_text)
-
-            # Validate
-            if "sequence" not in result or "confidence" not in result:
-                print(f"[WARN] Invalid LLM response structure")
-                return None
-
-            return result
-
-        except json.JSONDecodeError as e:
-            print(f"[ERROR] JSON parsing failed: {e}")
-            return None
+            raw_response_text = response.content[0].text.strip()
         except Exception as e:
-            print(f"[ERROR] Interpretation failed: {e}")
-            return None
+            print(f"[SEQ] Pass 1 API call failed: {e}")
+            return {
+                "interpretation": f"API error: {e}",
+                "sequence": [], "pass1_sequence": [],
+                "composite_name": None, "confidence": 0.0,
+                "validated": False, "validation_issues": [],
+                "user_feedback": None, "is_creative": creative,
+                "creative_reasoning": None, "raw_response": str(e),
+            }
+
+        result = self._parse_json_response(raw_response_text)
+
+        if result is None:
+            print(f"[SEQ] Pass 1 JSON parse failed — raw: {raw_response_text[:120]}")
+            return {
+                "interpretation": raw_response_text[:300],
+                "sequence": [], "pass1_sequence": [],
+                "composite_name": None, "confidence": 0.0,
+                "validated": False,
+                "validation_issues": ["Pass 1 returned non-JSON response"],
+                "user_feedback": None, "is_creative": creative,
+                "creative_reasoning": None, "raw_response": raw_response_text,
+            }
+
+        # Ensure required fields with safe defaults
+        result.setdefault("interpretation", "")
+        result.setdefault("sequence", [])
+        result.setdefault("composite_name", None)
+        result.setdefault("confidence", 0.5)
+        result.setdefault("validated", False)
+        result.setdefault("validation_issues", [])
+        result.setdefault("user_feedback", None)
+        result.setdefault("creative_reasoning", None)
+        result["is_creative"] = creative
+        result["pass1_sequence"] = list(result["sequence"])  # snapshot before validation
+
+        # Creative commands must never save a composite name
+        if creative:
+            result["composite_name"] = None
+
+        # ── Pass 2: Validation ────────────────────────────────────────────────
+        if result["sequence"]:
+            try:
+                val_prompt = self._build_validation_prompt(
+                    voice_command, result["sequence"], result["interpretation"]
+                )
+                val_response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=700,
+                    temperature=0,
+                    messages=[{"role": "user", "content": val_prompt}]
+                )
+                val_text = val_response.content[0].text.strip()
+                val_result = self._parse_json_response(val_text)
+
+                if val_result and "sequence" in val_result:
+                    issues = val_result.get("issues", [])
+                    if issues:
+                        print(f"[SEQ] Validator found {len(issues)} issue(s): {issues}")
+                    result["sequence"] = val_result["sequence"]
+                    result["validated"] = val_result.get("valid", True)
+                    result["validation_issues"] = issues
+                else:
+                    print(f"[SEQ] Validator returned unparseable response — keeping original")
+                    result["validated"] = False
+                    result["validation_issues"] = ["Validator response unparseable"]
+
+            except Exception as e:
+                print(f"[SEQ] Pass 2 validation failed: {e}")
+                result["validated"] = False
+                result["validation_issues"] = [f"Validation error: {e}"]
+        else:
+            result["validated"] = True
+            result["validation_issues"] = []
+
+        # ── Pass 3: Regeneration (if validator found fixable issues) ──────────
+        issues_after_p2 = result.get("validation_issues", [])
+        if issues_after_p2 and not result.get("raw_response"):
+            # Only retry if there were real structural issues (not just "unparseable")
+            real_issues = [i for i in issues_after_p2
+                           if "unparseable" not in i.lower() and "error" not in i.lower()]
+            if real_issues:
+                print(f"[SEQ] Pass 3: regenerating with {len(real_issues)} correction hint(s)")
+                try:
+                    p3_prompt = self._build_prompt(
+                        voice_command,
+                        is_creative=creative,
+                        correction_hints=real_issues
+                    )
+                    p3_response = self.client.messages.create(
+                        model=self.model,
+                        max_tokens=900,
+                        temperature=0,  # Correction pass always deterministic
+                        messages=[{"role": "user", "content": p3_prompt}]
+                    )
+                    p3_text = p3_response.content[0].text.strip()
+                    p3_result = self._parse_json_response(p3_text)
+
+                    if p3_result and "sequence" in p3_result:
+                        # Accept the corrected sequence, note that Pass 3 ran
+                        result["sequence"] = p3_result.get("sequence", result["sequence"])
+                        result["interpretation"] = p3_result.get("interpretation", result["interpretation"])
+                        result["confidence"] = p3_result.get("confidence", result["confidence"])
+                        result["user_feedback"] = p3_result.get("user_feedback", result["user_feedback"])
+                        result["creative_reasoning"] = p3_result.get("creative_reasoning", result["creative_reasoning"])
+                        result["validation_issues"] = [f"[P3 fixed] {i}" for i in real_issues]
+                        result["validated"] = True
+                        if creative:
+                            result["composite_name"] = None
+                        print(f"[SEQ] Pass 3 succeeded — sequence regenerated with corrections")
+                    else:
+                        print(f"[SEQ] Pass 3 returned unparseable — keeping Pass 2 result")
+                except Exception as e:
+                    print(f"[SEQ] Pass 3 failed: {e}")
+                    # Non-fatal — keep Pass 2 result
+
+        return result
 
     def interpret_and_execute(self, voice_command: str) -> bool:
         """
         Interpret a command and execute it.
         Learns new composites if confident.
-
         Returns True if execution succeeded.
         """
         print(f"[SEQ] Interpreting: '{voice_command}'")
@@ -179,6 +591,9 @@ JSON:"""
         print(f"[SEQ] Confidence: {result['confidence']:.2f}")
         print(f"[SEQ] Sequence: {len(result['sequence'])} steps")
 
+        if result.get("user_feedback"):
+            print(f"[SEQ] User feedback: {result['user_feedback']}")
+
         # Compile the sequence
         plan = self.compiler.compile_sequence(result["sequence"])
         if not plan or not plan.steps:
@@ -189,15 +604,14 @@ JSON:"""
         executor = get_executor()
         success = executor.execute_plan(plan)
 
-        # Learn if confident and successful
-        if success and result["confidence"] >= LLM_CONFIDENCE_THRESHOLD:
+        # Learn if confident and successful (never learn creative outputs)
+        if success and result["confidence"] >= LLM_CONFIDENCE_THRESHOLD and not result.get("is_creative"):
             composite_name = result.get("composite_name")
             if composite_name and not self.compiler.is_composite(composite_name):
-                # Learn new composite
                 self.compiler.learn_composite(
                     name=composite_name,
                     description=result["interpretation"],
-                    parameters={},  # Could extract from sequence
+                    parameters={},
                     sequence=result["sequence"],
                     confidence=result["confidence"],
                     source_phrase=voice_command
@@ -210,9 +624,9 @@ JSON:"""
         return result.get("confidence", 0) >= LLM_CONFIDENCE_THRESHOLD
 
 
-# -----------------------------------------------------------------------------
-# Convenience function
-# -----------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────────────
+# Singleton
+# ──────────────────────────────────────────────────────────────────────────────
 
 _interpreter_instance = None
 
@@ -224,14 +638,12 @@ def get_sequence_interpreter() -> SequenceInterpreter:
     return _interpreter_instance
 
 
-# -----------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 # Test
-# -----------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 
 def test_interpreter():
-    """Test the sequence interpreter."""
     print("=== Sequence Interpreter Test ===\n")
-
     try:
         interpreter = SequenceInterpreter()
     except Exception as e:
@@ -241,8 +653,9 @@ def test_interpreter():
     test_commands = [
         "move right a little",
         "pick up the cheese",
-        "put the tomato in the assembly area",
-        "go home",
+        "go wild",
+        "put it back",
+        "pick up the avocado",
     ]
 
     for cmd in test_commands:
@@ -251,11 +664,17 @@ def test_interpreter():
         if result:
             print(f"  Interpretation: {result['interpretation']}")
             print(f"  Confidence: {result['confidence']:.2f}")
-            print(f"  Sequence:")
+            print(f"  Creative: {result.get('is_creative')}")
+            print(f"  Validated: {result.get('validated')} issues={result.get('validation_issues')}")
+            if result.get("user_feedback"):
+                print(f"  ⚠ User feedback: {result['user_feedback']}")
+            if result.get("creative_reasoning"):
+                print(f"  💡 Reasoning: {result['creative_reasoning']}")
+            print(f"  Sequence ({len(result['sequence'])} steps):")
             for step in result["sequence"]:
                 print(f"    - {step['instruction']}({step.get('params', {})})")
         else:
-            print("  Failed to interpret")
+            print("  → None (empty input)")
 
 
 if __name__ == "__main__":

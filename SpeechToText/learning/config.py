@@ -4,7 +4,9 @@ Configuration for LLM-based intent interpretation.
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from SpeechToText/ regardless of working directory
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+load_dotenv(dotenv_path=_env_path, override=True)
 
 # Anthropic Claude API configuration
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
