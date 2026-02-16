@@ -303,8 +303,14 @@ class InstructionCompiler:
         """
         lines = []
 
-        # ── Composites (the only thing the LLM should call) ──────────────────
+        # ── Primitives (llm_visible only) + Composites ───────────────────────
         lines.append("AVAILABLE INSTRUCTIONS (call these by name in your sequence):")
+        for name, info in self.get_primitives().items():
+            if not info.get("llm_visible", False):
+                continue
+            params = info.get("parameters", {})
+            param_str = ", ".join(params.keys()) if params else ""
+            lines.append(f"  - {name}({param_str}): {info.get('description', '')} [primitive]")
         for name, info in self.get_composites().items():
             if not info.get("llm_visible", True):
                 continue

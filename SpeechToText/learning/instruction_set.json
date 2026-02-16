@@ -34,10 +34,10 @@
     },
 
     "move_relative": {
-      "description": "Move TCP relative to current position along one axis.",
+      "description": "Move TCP relative to current position along one cardinal axis. Use for spatial nudges: 'move right', 'shift up a bit', 'go forward'. NOT for switching assembly zones — use set_active_zone for that.",
       "parameters": {
         "direction": "string — one of: right, left, up, down, forward, backward",
-        "distance": "float — distance in cm. Scaled by DISTANCE_SCALE to Unity/RobotStudio units. Defaults resolved from motion_params."
+        "distance": "float — distance in cm. Use 1.0 for 'a little/a bit', 3.0–5.0 for 'a lot/far'. Default 1.0."
       },
       "preconditions": [
         "resulting position must be within workspace_bounds (soft check — RobotStudio enforces hard limit)"
@@ -45,8 +45,8 @@
       "defaults": {
         "distance": "motion_params.defaults.move_distance_cm"
       },
-      "example": "move_relative(\"up\", 5.0)",
-      "llm_visible": false
+      "example": "move_relative(\"right\", 1.0)",
+      "llm_visible": true
     },
 
     "gripper_set": {
@@ -68,15 +68,15 @@
     },
 
     "wait": {
-      "description": "Pause execution for a fixed duration. Use sparingly.",
+      "description": "Pause execution for a fixed duration. Use for dramatic effect, pacing, or 'hold there for a second'.",
       "parameters": {
         "seconds": "float — wall time to wait. Default 0.5s."
       },
       "defaults": {
         "seconds": 0.5
       },
-      "example": "wait(0.5)",
-      "llm_visible": false
+      "example": "wait(1.0)",
+      "llm_visible": true
     },
 
     "set_speed": {

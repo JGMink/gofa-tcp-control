@@ -206,6 +206,17 @@ Speed (adjust_speed) is expressive punctuation — use it to add drama, contrast
 
 In creative_reasoning: state "Axis 1: {_axis1_choice} × Axis 2: {_axis2_choice}" then explain the sequence you built.
 Set composite_name to null. Always produce a non-empty sequence.
+
+━━━ CREATIVE EXAMPLES ━━━
+
+Command: "impress me"
+{{"interpretation": "inverted structure, full ingredient set — upside-down sandwich built tall", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.85, "user_feedback": null, "creative_reasoning": "Axis 1: inverted × Axis 2: full_set — started with what normally goes on top, ended with bread at the bottom. Every ingredient used once. Slow speed because this is deliberate, not accidental."}}
+
+Command: "build a tower"
+{{"interpretation": "single tall structure, one ingredient only — bread monolith", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: single_tall × Axis 2: all_one — bread only, maximize height. A tower is a structural thing, not a food thing. Speed alternates slow/fast between layers for rhythmic drama."}}
+
+Command: "do something with the lettuce and tomato"
+{{"interpretation": "two-zone contrast, constrained to named ingredients only", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: two_zone_contrast × Axis 2: constrained — lettuce gets left, tomato gets right, only named ingredients. The contrast is the point: slow careful lettuce tower vs fast stacked tomato tower side by side."}}
 """
 
         prompt = f"""You are the instruction generator for an ABB GoFa robot arm that builds sandwich assemblies.
@@ -239,18 +250,12 @@ Return ONLY a JSON object — no explanation, no prose, no markdown fences. Just
 8. For fragile items (lettuce, tomato), prepend adjust_speed("slow") unless already slow
 9. MULTI-ZONE: When building in a non-default zone, call set_active_zone("zone") FIRST, then add_layer calls.
    Zone names: assembly_fixture (default/center), assembly_left, assembly_right
-   Spatial words: "left" → assembly_left, "right" → assembly_right, "center"/"middle" → assembly_fixture
+   Spatial words in ASSEMBLY context: "left" → assembly_left, "right" → assembly_right, "center"/"middle" → assembly_fixture
    "over there" / no specifier → use assembly_fixture (default)
+   set_active_zone is ONLY for switching assembly build targets — NEVER use it for robot motion.
+   Spatial words like "move right", "shift left", "go forward" → use move_relative, NOT set_active_zone.
 10. Bread can go ANYWHERE in a stack — it is not required only at the ends. Treat it like any other ingredient.
 
-━━━ CREATIVE COMMANDS ━━━
-If the command is open-ended ("impress me", "go wild", "make something beautiful",
-"build a tower", "surprise me", "do something", "make it interesting") — this is PERMISSION
-to do something genuinely surprising. IMPORTANT: do NOT produce a standard sandwich.
-Standard = bread, filling, bread. That is the boring answer.
-See CREATIVE MODE — AXES section above: pick one from Axis 1 (spatial structure)
-and one from Axis 2 (ingredient logic), combine them, explain both choices.
-Always set composite_name to null. Always include creative_reasoning.
 {creative_section}
 ━━━ RECOVERY COMMANDS ━━━
 "put it back" / "undo" → return_to_stack() (no-op if not holding — safe to call always)
@@ -294,14 +299,11 @@ Command: "make a cheese sandwich"
 Command: "make a cheese sandwich on the left and a BLT on the right"
 {{"interpretation": "Build cheese sandwich at left zone, then BLT at right zone", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
 
-Command: "impress me"
-{{"interpretation": "inverted structure, full ingredient set — upside-down sandwich built tall", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.85, "user_feedback": null, "creative_reasoning": "Axis 1: inverted — started with what normally goes on top, ended with bread at the bottom. Axis 2: full_set — every ingredient used once. The inversion makes structural logic visible. Slow speed because this is deliberate, not accidental."}}
+Command: "move right a little"
+{{"interpretation": "Nudge TCP right by 1cm", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "right", "distance": 1.0}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
 
-Command: "build a tower"
-{{"interpretation": "single tall structure, one ingredient only — bread monolith", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: single_tall — maximize height in one zone. Axis 2: all_one — bread only. A tower is a structural thing, not a food thing. Speed alternates slow/fast between layers for comedic rhythmic drama."}}
-
-Command: "do something with the lettuce and tomato"
-{{"interpretation": "two-zone contrast, constrained to named ingredients only", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: two_zone_contrast — lettuce gets the left zone, tomato gets the right, each built independently. Axis 2: constrained — only the two named ingredients, nothing else added. The contrast is the point: slow careful lettuce tower vs fast stacked tomato tower side by side."}}
+Command: "shift forward a lot"
+{{"interpretation": "Move TCP forward 5cm", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "forward", "distance": 5.0}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
 
 Command: "start over"
 {{"interpretation": "Clear the assembly and return home", "sequence": [{{"instruction": "clear_assembly", "params": {{}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
@@ -497,7 +499,19 @@ JSON:"""
             result["composite_name"] = None
 
         # ── Pass 2: Validation ────────────────────────────────────────────────
-        if result["sequence"]:
+        # Skip validation for simple, high-confidence sequences that don't touch assembly.
+        # add_layer is where ingredient/location errors actually happen — always validate those.
+        _has_assembly = any(s.get("instruction") == "add_layer" for s in result["sequence"])
+        _skip_pass2 = (
+            not creative
+            and result["confidence"] >= 0.90
+            and not _has_assembly
+        )
+        if _skip_pass2:
+            result["validated"] = True
+            result["validation_issues"] = []
+
+        if result["sequence"] and not _skip_pass2:
             try:
                 val_prompt = self._build_validation_prompt(
                     voice_command, result["sequence"], result["interpretation"]
