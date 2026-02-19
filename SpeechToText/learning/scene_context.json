@@ -19,7 +19,7 @@
 
   "items": {
     "bread": {
-      "description": "Bread tile (100x100x10mm PLA prop)",
+      "description": "Bread tile (100x100x10mm PLA prop) — represents any starch or base: bun, roll, toast, sourdough, pita, wrap, cracker, waffle, english muffin",
       "slot_location": "bread_slot",
       "properties": {
         "stackable": true,
@@ -28,7 +28,7 @@
       }
     },
     "cheese": {
-      "description": "Cheese tile (100x100x10mm PLA prop)",
+      "description": "Cheese tile (100x100x10mm PLA prop) — represents any dairy or soft layer: cheddar, swiss, brie, mozzarella, cream cheese, hummus, sauce, spread",
       "slot_location": "cheese_slot",
       "properties": {
         "stackable": true,
@@ -37,7 +37,7 @@
       }
     },
     "lettuce": {
-      "description": "Lettuce tile (100x100x10mm PLA prop)",
+      "description": "Lettuce tile (100x100x10mm PLA prop) — represents any leafy green or vegetable layer: spinach, arugula, kale, greens, cabbage, microgreens, basil",
       "slot_location": "lettuce_slot",
       "properties": {
         "stackable": true,
@@ -46,7 +46,7 @@
       }
     },
     "tomato": {
-      "description": "Tomato tile (100x100x10mm PLA prop)",
+      "description": "Tomato tile (100x100x10mm PLA prop) — represents any juicy or acidic topping: roma, beefsteak, roasted pepper, pickle, onion, cucumber, avocado",
       "slot_location": "tomato_slot",
       "properties": {
         "stackable": true,
@@ -55,7 +55,7 @@
       }
     },
     "meat": {
-      "description": "Protein/meat tile (100x100x10mm PLA prop)",
+      "description": "Protein/meat tile (100x100x10mm PLA prop) — represents any protein layer: bacon, patty, burger, ham, turkey, chicken, tuna, tofu, falafel, beef",
       "slot_location": "meat_slot",
       "properties": {
         "stackable": true,

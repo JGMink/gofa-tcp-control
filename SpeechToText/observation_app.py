@@ -99,6 +99,7 @@ html, body, [data-testid="stAppViewContainer"] {
     padding: 1px 0;
 }
 .steps li::before { content: "→ "; color: #4a6a7a; }
+.steps li.dim { opacity: 0.45; }
 
 /* composite pill */
 .composite-pill {
@@ -377,13 +378,13 @@ def _steps_html(sequence: list, dim: bool = False) -> str:
     """Render a sequence as an HTML step list."""
     if not sequence:
         return '<span style="color:#3a4a5a; font-size:0.82rem">(empty sequence)</span>'
-    opacity = ' style="opacity:0.45"' if dim else ''
+    cls = ' class="dim"' if dim else ''
     items = ""
     for step in sequence:
         inst = step.get("instruction", "?")
         params = step.get("params", {})
         param_str = ", ".join(f"{k}={repr(v)}" for k, v in params.items()) if params else ""
-        items += f"<li{opacity}>{inst}({param_str})</li>"
+        items += f"<li{cls}>{inst}({param_str})</li>"
     return f'<ul class="steps">{items}</ul>'
 
 
@@ -436,11 +437,7 @@ def render_result_bubble(command: str, note: str, result: Optional[dict], elapse
     p2_insts = [s.get("instruction") for s in sequence]
     if pass1_sequence and p1_insts != p2_insts:
         p1_html = _steps_html(pass1_sequence, dim=True)
-        pass_diff_html = f"""
-        <div class="pass-label">Pass 1 (before validation)</div>
-        <div class="pass-diff">{p1_html}</div>
-        <div class="pass-label">Pass 2 (after validation)</div>
-        """
+        pass_diff_html = f'<div class="pass-label">Pass 1 (before validation)</div><div class="pass-diff">{p1_html}</div><div class="pass-label">Pass 2 (after validation)</div>'
 
     # Final sequence
     final_steps_html = _steps_html(sequence)

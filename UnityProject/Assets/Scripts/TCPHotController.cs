@@ -8,10 +8,14 @@ public class TCPHotController : MonoBehaviour
     [SerializeField] private string configPath = "tcp_commands.json";
     [SerializeField] private float pollInterval = 0.1f;
     [SerializeField] private float moveSpeed = 2f;
-    
+
+    [Header("Gripper")]
+    [SerializeField] private GripperController gripperController;
+
     private DateTime lastModified;
     private Coroutine activeMove;
     private string fullPath;
+    private float currentGripperPosition = 0.11f;  // Start fully open (RG2: 110mm)
     
     void Start()
     {
@@ -20,6 +24,20 @@ public class TCPHotController : MonoBehaviour
         fullPath = Path.Combine(projectRoot, configPath);
 
         Debug.Log($"Watching: {fullPath}");
+
+        // Auto-find gripper controller if not assigned
+        if (gripperController == null)
+        {
+            gripperController = FindObjectOfType<GripperController>();
+            if (gripperController != null)
+            {
+                Debug.Log($"Auto-found GripperController on: {gripperController.gameObject.name}");
+            }
+            else
+            {
+                Debug.LogWarning("No GripperController found - gripper commands will be ignored");
+            }
+        }
 
         // Write current position to file on startup
         WriteCurrentPosition();
@@ -42,13 +60,14 @@ public class TCPHotController : MonoBehaviour
             {
                 x = transform.position.x,
                 y = transform.position.y,
-                z = transform.position.z
+                z = transform.position.z,
+                gripper_position = currentGripperPosition
             };
 
             string json = JsonUtility.ToJson(cmd, true);
             File.WriteAllText(fullPath, json);
 
-            Debug.Log($"Wrote current position to file: ({cmd.x:F3}, {cmd.y:F3}, {cmd.z:F3})");
+            Debug.Log($"Wrote position to file: ({cmd.x:F3}, {cmd.y:F3}, {cmd.z:F3}), gripper: {cmd.gripper_position * 1000:F1}mm");
         }
         catch (Exception e)
         {
@@ -101,12 +120,27 @@ public class TCPHotController : MonoBehaviour
             {
                 StopCoroutine(activeMove);
             }
-            
+
             // Start new movement
             Vector3 targetPos = new Vector3(cmd.x, cmd.y, cmd.z);
             activeMove = StartCoroutine(MoveTo(targetPos));
-            
+
             Debug.Log($"Moving TCP to: ({cmd.x}, {cmd.y}, {cmd.z})");
+
+            // Handle gripper position
+            float newGripper = cmd.gripper_position;
+            if (Mathf.Abs(newGripper - currentGripperPosition) > 0.001f)
+            {
+                currentGripperPosition = newGripper;
+                if (gripperController != null)
+                {
+                    gripperController.SetGripperPosition(currentGripperPosition);
+                    string state = currentGripperPosition < 0.02f ? "CLOSED" :
+                                   currentGripperPosition > 0.09f ? "OPEN" :
+                                   $"{currentGripperPosition * 1000:F0}mm";
+                    Debug.Log($"Gripper -> {state} ({currentGripperPosition * 1000:F1}mm)");
+                }
+            }
         }
         catch (IOException)
         {
@@ -148,7 +182,7 @@ public class TCPHotController : MonoBehaviour
             TCPAck ack = new TCPAck
             {
                 completed = true,
-                position = new TCPCommand { x = position.x, y = position.y, z = position.z },
+                position = new TCPCommand { x = position.x, y = position.y, z = position.z, gripper_position = currentGripperPosition },
                 timestamp = System.DateTime.Now.ToString("o")
             };
 
@@ -170,6 +204,7 @@ public class TCPCommand
     public float x;
     public float y;
     public float z;
+    public float gripper_position;  // 0.0 = closed, 0.11 = fully open (RG2)
 }
 
 [System.Serializable]

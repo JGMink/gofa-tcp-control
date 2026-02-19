@@ -34,7 +34,7 @@
     },
 
     "move_relative": {
-      "description": "Move TCP relative to current position along one cardinal axis. Use for spatial nudges: 'move right', 'shift up a bit', 'go forward'. NOT for switching assembly zones — use set_active_zone for that.",
+      "description": "Move TCP relative to current position along one cardinal axis. Use for spatial nudges: 'move right', 'shift up a bit', 'go forward'. For diagonal movement chain two calls (e.g. right then forward). NOT for switching assembly zones — use set_active_zone for that.",
       "parameters": {
         "direction": "string — one of: right, left, up, down, forward, backward",
         "distance": "float — distance in cm. Use 1.0 for 'a little/a bit', 3.0–5.0 for 'a lot/far'. Default 1.0."

@@ -268,14 +268,22 @@ Return ONLY a JSON object — no explanation, no prose, no markdown fences. Just
 "do it faster" / "speed up" → adjust_speed("fast") with no other action
 "gently" / "nice and slow" / "take your time" → adjust_speed("slow") prepended to sequence
 
-━━━ UNKNOWN / IMPOSSIBLE COMMANDS ━━━
-If a command references an item NOT in the available items list (e.g. avocado, pickles, ham):
-- Set sequence to []
-- Set confidence to 0.1
-- Set user_feedback to a friendly message explaining what's not available and what IS available
-- Example: "I don't have avocado — available ingredients are: bread, meat, cheese, lettuce, tomato"
+━━━ UNKNOWN INGREDIENTS — SUBSTITUTE, DON'T REFUSE ━━━
+If a command references an item not in the available items list, DO NOT return an empty sequence.
+Instead: pick the closest available item based on the item descriptions (each item lists what it represents),
+substitute it, produce the full sequence using that substitute, and note the swap in user_feedback.
 
-If a command is physically impossible or makes no sense:
+Substitution guide (use item descriptions to reason — these are examples, not exhaustive):
+- avocado, pickle, onion, cucumber, roasted pepper → tomato (juicy/acidic topping)
+- bacon, ham, turkey, chicken, tuna, tofu, falafel → meat (protein layer)
+- spinach, arugula, kale, greens, cabbage → lettuce (leafy green)
+- cheddar, swiss, brie, mozzarella, sauce, spread, hummus → cheese (dairy/soft layer)
+- bun, roll, pita, wrap, sourdough, toast, waffle → bread (starch/base)
+
+user_feedback for substitutions: "I don't have [requested] — using [substitute] as the closest match"
+Keep confidence at 0.75–0.85 for substitutions (you understood the intent, just swapped the tile).
+
+If a command is physically impossible or makes no sense (not just an unknown ingredient):
 - Set confidence low (< 0.4)
 - Set user_feedback explaining the issue
 - Still try to produce the closest valid sequence if possible
@@ -305,6 +313,9 @@ Command: "move right a little"
 Command: "shift forward a lot"
 {{"interpretation": "Move TCP forward 5cm", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "forward", "distance": 5.0}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
 
+Command: "move diagonally forward and right"
+{{"interpretation": "Diagonal move — forward then right, 1cm each", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "forward", "distance": 1.0}}}}, {{"instruction": "move_relative", "params": {{"direction": "right", "distance": 1.0}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
+
 Command: "start over"
 {{"interpretation": "Clear the assembly and return home", "sequence": [{{"instruction": "clear_assembly", "params": {{}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
 
@@ -318,7 +329,10 @@ Command: "carefully pick up the lettuce"
 {{"interpretation": "Set slow speed then pick up lettuce", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "pick_up", "params": {{"item": "lettuce"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
 
 Command: "pick up the avocado"
-{{"interpretation": "Avocado not available in the system", "sequence": [], "composite_name": null, "confidence": 0.1, "user_feedback": "I don't have avocado — available ingredients are: bread, meat, cheese, lettuce, tomato", "creative_reasoning": null}}
+{{"interpretation": "No avocado — picking up tomato as closest match (juicy topping)", "sequence": [{{"instruction": "pick_up", "params": {{"item": "tomato"}}}}], "composite_name": null, "confidence": 0.8, "user_feedback": "I don't have avocado — using tomato as the closest match", "creative_reasoning": null}}
+
+Command: "make me a BLT with pickles"
+{{"interpretation": "BLT with pickles substituted as tomato (juicy/acidic topping)", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.8, "user_feedback": "I don't have pickles — using tomato as the closest match", "creative_reasoning": null}}
 
 Command: "make a BLT every time I say sandwich"
 {{"interpretation": "Define BLT as the default sandwich mapping", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_blt", "confidence": 0.9, "user_feedback": "Mapping noted — 'sandwich' will be saved as an alias for make_blt", "creative_reasoning": null}}
@@ -454,18 +468,28 @@ JSON:"""
                 model=self.model,
                 max_tokens=900,
                 temperature=temperature,
+                timeout=30,
                 messages=[{"role": "user", "content": prompt}]
             )
             raw_response_text = response.content[0].text.strip()
         except Exception as e:
-            print(f"[SEQ] Pass 1 API call failed: {e}")
+            err = str(e)
+            if "rate" in err.lower() or "529" in err or "overloaded" in err.lower():
+                print(f"[SEQ] Pass 1 rate limit / overloaded: {e}")
+                user_fb = "API rate limit or overloaded — try again in a moment"
+            elif "timeout" in err.lower():
+                print(f"[SEQ] Pass 1 timed out after 30s: {e}")
+                user_fb = "API call timed out — check connection or try again"
+            else:
+                print(f"[SEQ] Pass 1 API call failed: {e}")
+                user_fb = f"API error: {err}"
             return {
-                "interpretation": f"API error: {e}",
+                "interpretation": user_fb,
                 "sequence": [], "pass1_sequence": [],
                 "composite_name": None, "confidence": 0.0,
                 "validated": False, "validation_issues": [],
-                "user_feedback": None, "is_creative": creative,
-                "creative_reasoning": None, "raw_response": str(e),
+                "user_feedback": user_fb, "is_creative": creative,
+                "creative_reasoning": None, "raw_response": err,
             }
 
         result = self._parse_json_response(raw_response_text)
@@ -499,13 +523,41 @@ JSON:"""
             result["composite_name"] = None
 
         # ── Pass 2: Validation ────────────────────────────────────────────────
-        # Skip validation for simple, high-confidence sequences that don't touch assembly.
-        # add_layer is where ingredient/location errors actually happen — always validate those.
-        _has_assembly = any(s.get("instruction") == "add_layer" for s in result["sequence"])
+        # Python-side pre-check: catch obvious structural problems without an LLM call.
+        # If any of these fire, Pass 2 is warranted. Otherwise we skip it.
+        def _python_issues(seq: list) -> list:
+            issues = []
+            valid_instructions = set(self.compiler.get_instruction_list_for_prompt().split(", "))
+            valid_items = set(self.compiler.get_items().keys())
+            for step in seq:
+                inst = step.get("instruction", "")
+                if inst and inst not in valid_instructions:
+                    issues.append(f"unknown instruction: {inst}")
+                if inst == "add_layer":
+                    item = step.get("params", {}).get("item", "")
+                    if item and item not in valid_items:
+                        issues.append(f"unknown item: {item}")
+            return issues
+
+        def _matches_known_recipe(seq: list) -> bool:
+            recipes = self.compiler.scene_context.get("recipes", {})
+            p1_items = [s["params"].get("item") for s in seq
+                        if s.get("instruction") == "add_layer"]
+            for recipe in recipes.values():
+                if isinstance(recipe, dict) and p1_items == recipe.get("layers", []):
+                    return True
+            return False
+
+        _py_issues = _python_issues(result["sequence"])
+        _needs_pass2 = bool(_py_issues)  # structural problem Python caught — always validate
+
         _skip_pass2 = (
-            not creative
-            and result["confidence"] >= 0.90
-            and not _has_assembly
+            not _needs_pass2 and (
+                creative                                     # no correct answer to validate
+                or result["confidence"] >= 0.88             # data: P2 never changes high-conf outputs
+                or _matches_known_recipe(result["sequence"]) # exact recipe — Python-verified
+                or not result["sequence"]                    # empty sequence — nothing to validate
+            )
         )
         if _skip_pass2:
             result["validated"] = True
@@ -520,6 +572,7 @@ JSON:"""
                     model=self.model,
                     max_tokens=700,
                     temperature=0,
+                    timeout=30,
                     messages=[{"role": "user", "content": val_prompt}]
                 )
                 val_text = val_response.content[0].text.strip()
@@ -563,6 +616,7 @@ JSON:"""
                         model=self.model,
                         max_tokens=900,
                         temperature=0,  # Correction pass always deterministic
+                        timeout=30,
                         messages=[{"role": "user", "content": p3_prompt}]
                     )
                     p3_text = p3_response.content[0].text.strip()

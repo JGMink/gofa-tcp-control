@@ -208,6 +208,23 @@ public class GrabbableObject : MonoBehaviour
         SyncToFile();
     }
 
+    // Public API methods for other scripts
+    public bool IsHeld()
+    {
+        return isHeld;
+    }
+
+    public void OnGrabbed(Transform gripperTransform)
+    {
+        gripper = gripperTransform;
+        PickUp();
+    }
+
+    public void OnReleased()
+    {
+        Release();
+    }
+
     void SyncToFile()
     {
         lastSyncedPosition = transform.position;

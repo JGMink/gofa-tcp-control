@@ -22,6 +22,36 @@ public class GripperTest : MonoBehaviour
         if (gripperController == null)
         {
             gripperController = FindObjectOfType<GripperController>();
+            if (gripperController != null)
+            {
+                Debug.Log($"✓ Auto-found GripperController on: {gripperController.gameObject.name}");
+            }
+            else
+            {
+                Debug.LogError("✗ GripperController not found! Make sure it's attached to your gripper GameObject.");
+            }
+        }
+
+        // Auto-find fingers if not assigned
+        if (gripperController != null)
+        {
+            if (leftFinger == null)
+            {
+                leftFinger = gripperController.fingerLeft;
+                if (leftFinger != null) Debug.Log($"✓ Auto-found left finger: {leftFinger.name}");
+            }
+
+            if (rightFinger == null)
+            {
+                rightFinger = gripperController.fingerRight;
+                if (rightFinger != null) Debug.Log($"✓ Auto-found right finger: {rightFinger.name}");
+            }
+
+            if (gripperBase == null)
+            {
+                gripperBase = gripperController.gripperBase;
+                if (gripperBase != null) Debug.Log($"✓ Auto-found gripper base: {gripperBase.name}");
+            }
         }
 
         if (runTestOnStart)

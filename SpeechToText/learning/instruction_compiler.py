@@ -310,7 +310,8 @@ class InstructionCompiler:
                 continue
             params = info.get("parameters", {})
             param_str = ", ".join(params.keys()) if params else ""
-            lines.append(f"  - {name}({param_str}): {info.get('description', '')} [primitive]")
+            desc = info.get("description", "").split(".")[0]
+            lines.append(f"  - {name}({param_str}): {desc} [primitive]")
         for name, info in self.get_composites().items():
             if not info.get("llm_visible", True):
                 continue
@@ -318,7 +319,8 @@ class InstructionCompiler:
             param_str = ", ".join(params.keys()) if params else ""
             learned = " [learned]" if info.get("learned") else ""
             runtime = " [runtime]" if info.get("runtime") else ""
-            lines.append(f"  - {name}({param_str}): {info.get('description', '')}{runtime}{learned}")
+            desc = info.get("description", "").split(".")[0]
+            lines.append(f"  - {name}({param_str}): {desc}{runtime}{learned}")
 
         lines.append("")
 
@@ -327,8 +329,12 @@ class InstructionCompiler:
         for name, info in self.get_items().items():
             if name.startswith("_"):
                 continue
-            fragile = " [fragile — prefer slow speed]" if info.get("properties", {}).get("fragile") else ""
-            lines.append(f"  - {name}{fragile}")
+            fragile = " [fragile]" if info.get("properties", {}).get("fragile") else ""
+            desc = info.get("description", "")
+            # Strip physical dimensions — keep only the alias hint after the em dash
+            if " — " in desc:
+                desc = desc.split(" — ", 1)[1]
+            lines.append(f"  - {name}{fragile}: {desc}")
 
         lines.append("")
 
@@ -337,7 +343,10 @@ class InstructionCompiler:
         for name, info in self.get_locations().items():
             if name.startswith("_"):
                 continue
-            lines.append(f"  - {name}: {info.get('description', '')}")
+            desc = info.get("description", "")
+            # Trim to first sentence only
+            desc = desc.split(".")[0].split(" Also aliased")[0].strip()
+            lines.append(f"  - {name}: {desc}")
 
         lines.append("")
 

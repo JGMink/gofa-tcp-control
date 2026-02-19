@@ -31,11 +31,27 @@ public class GripperController : MonoBehaviour
     public string commandFilePath = "tcp_commands.json";
     public float pollInterval = 0.1f;  // Check for commands every 100ms
 
+    [Header("Arc Motion Settings (RG2 4-bar linkage)")]
+    [Tooltip("Max rotation angle in degrees when fully closed. RG2 fingers pivot ~46 degrees from open to closed.")]
+    public float maxFingerAngle = 46f;
+
+    [Tooltip("Pivot point offset in finger's local space (X). The OBJ pivot is at ~76mm along the finger length. " +
+             "Adjust if mesh origin differs from pivot location.")]
+    public Vector3 leftPivotOffset = Vector3.zero;
+
+    [Tooltip("Pivot point offset for right finger (usually mirrored from left).")]
+    public Vector3 rightPivotOffset = Vector3.zero;
+
+    [Tooltip("Rotation axis in local space. For RG2, fingers rotate around local Z axis.")]
+    public Vector3 rotationAxis = Vector3.forward;  // Local Z
+
     // Internal state
     private float currentGripPosition = 0.110f;  // Start fully open (RG2: 110mm)
     private float targetGripPosition = 0.110f;
     private Vector3 leftFingerStartPos;
     private Vector3 rightFingerStartPos;
+    private Quaternion leftFingerStartRot;
+    private Quaternion rightFingerStartRot;
     private float lastPollTime;
 
     [System.Serializable]
@@ -56,9 +72,11 @@ public class GripperController : MonoBehaviour
             return;
         }
 
-        // Store initial finger positions
+        // Store initial finger positions AND rotations (open position)
         leftFingerStartPos = fingerLeft.localPosition;
         rightFingerStartPos = fingerRight.localPosition;
+        leftFingerStartRot = fingerLeft.localRotation;
+        rightFingerStartRot = fingerRight.localRotation;
 
         // Set stroke based on model type
         if (modelType == GripperModel.RG6)
@@ -73,17 +91,18 @@ public class GripperController : MonoBehaviour
         targetGripPosition = maxStroke;
         UpdateFingerPositions();
 
-        Debug.Log($"GripperController initialized: Model={modelType}, MaxStroke={maxStroke}m, Force={minForce}-{maxForce}N");
+        Debug.Log($"GripperController initialized: Model={modelType}, MaxStroke={maxStroke * 1000:F0}mm");
+        Debug.Log($"  Finger start: L_pos={leftFingerStartPos}, R_pos={rightFingerStartPos}");
+        Debug.Log($"  Finger start: L_rot={leftFingerStartRot.eulerAngles}, R_rot={rightFingerStartRot.eulerAngles}");
+        Debug.Log($"  Arc motion: maxAngle={maxFingerAngle}deg, axis={rotationAxis}");
+        Debug.Log($"  Pivot offsets: L={leftPivotOffset}, R={rightPivotOffset}");
     }
 
     void Update()
     {
-        // Poll for commands from file
-        if (Time.time - lastPollTime >= pollInterval)
-        {
-            ReadGripperCommands();
-            lastPollTime = Time.time;
-        }
+        // NOTE: File polling is disabled - TCPHotController reads tcp_commands.json
+        // and calls SetGripperPosition() on this component. This avoids double-reads
+        // and format mismatches.
 
         // Smoothly animate to target position
         if (Mathf.Abs(currentGripPosition - targetGripPosition) > 0.0001f)
@@ -98,50 +117,65 @@ public class GripperController : MonoBehaviour
         }
     }
 
-    void ReadGripperCommands()
-    {
-        if (!File.Exists(commandFilePath))
-            return;
-
-        try
-        {
-            string json = File.ReadAllText(commandFilePath);
-            TCPCommand command = JsonUtility.FromJson<TCPCommand>(json);
-
-            if (command != null && command.gripper_position >= 0)
-            {
-                // Clamp to valid range
-                float newTarget = Mathf.Clamp(command.gripper_position, minStroke, maxStroke);
-
-                if (Mathf.Abs(newTarget - targetGripPosition) > 0.001f)
-                {
-                    targetGripPosition = newTarget;
-                    Debug.Log($"Gripper command received: {targetGripPosition * 1000:F1}mm");
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"Failed to read gripper command: {e.Message}");
-        }
-    }
-
     void UpdateFingerPositions()
     {
-        // OnRobot RG2/RG6 fingers move symmetrically from center
-        // Each finger moves half the total stroke
-        float halfStroke = currentGripPosition / 2.0f;
+        // RG2 fingers pivot on pins (4-bar linkage mechanism).
+        // The RG2 manual confirms: "circular movement of the finger arms"
+        //
+        // closeRatio: 0 = fully open (maxStroke), 1 = fully closed (0mm)
+        // fingerAngle: rotation in degrees from open position
+        //
+        // Each finger rotates around a pivot point. As it rotates:
+        //   - The fingertip moves inward (closing)
+        //   - AND swings slightly forward (the arc effect the user noticed)
+        //
+        // Left finger rotates in POSITIVE direction around rotationAxis (e.g. +Z)
+        // Right finger rotates in NEGATIVE direction around rotationAxis (mirrored)
 
-        // Update finger positions (adjust axis based on your model's orientation)
-        // This assumes fingers move along the X-axis - adjust if needed
+        float closeRatio = 1f - (currentGripPosition / maxStroke);
+        float fingerAngle = closeRatio * maxFingerAngle;
+
         if (fingerLeft != null)
         {
-            fingerLeft.localPosition = leftFingerStartPos + new Vector3(-halfStroke, 0, 0);
+            // Apply rotation around the pivot point
+            // 1. Start from the stored initial rotation
+            // 2. Apply the closing rotation
+            Quaternion closingRotation = Quaternion.AngleAxis(fingerAngle, rotationAxis);
+
+            if (leftPivotOffset == Vector3.zero)
+            {
+                // Simple rotation around the finger's own origin
+                fingerLeft.localRotation = leftFingerStartRot * closingRotation;
+                fingerLeft.localPosition = leftFingerStartPos;
+            }
+            else
+            {
+                // Rotate around an offset pivot point
+                // This moves the transform position as well as rotating it
+                fingerLeft.localRotation = leftFingerStartRot * closingRotation;
+                Vector3 pivotWorld = fingerLeft.parent.TransformPoint(leftFingerStartPos + leftPivotOffset);
+                Vector3 startWorld = fingerLeft.parent.TransformPoint(leftFingerStartPos);
+                Vector3 rotatedOffset = closingRotation * (-leftPivotOffset);
+                fingerLeft.localPosition = leftFingerStartPos + leftPivotOffset + rotatedOffset;
+            }
         }
 
         if (fingerRight != null)
         {
-            fingerRight.localPosition = rightFingerStartPos + new Vector3(halfStroke, 0, 0);
+            // Right finger rotates in opposite direction (mirrored)
+            Quaternion closingRotation = Quaternion.AngleAxis(-fingerAngle, rotationAxis);
+
+            if (rightPivotOffset == Vector3.zero)
+            {
+                fingerRight.localRotation = rightFingerStartRot * closingRotation;
+                fingerRight.localPosition = rightFingerStartPos;
+            }
+            else
+            {
+                fingerRight.localRotation = rightFingerStartRot * closingRotation;
+                Vector3 rotatedOffset = closingRotation * (-rightPivotOffset);
+                fingerRight.localPosition = rightFingerStartPos + rightPivotOffset + rotatedOffset;
+            }
         }
     }
 
@@ -179,6 +213,28 @@ public class GripperController : MonoBehaviour
             // Draw line between fingers to visualize grip width
             Gizmos.color = Color.cyan;
             Gizmos.DrawLine(fingerLeft.position, fingerRight.position);
+
+            // Draw pivot points if set
+            if (leftPivotOffset != Vector3.zero)
+            {
+                Gizmos.color = Color.red;
+                Vector3 leftPivotWorld = fingerLeft.TransformPoint(leftPivotOffset);
+                Gizmos.DrawWireSphere(leftPivotWorld, 0.002f);
+            }
+            if (rightPivotOffset != Vector3.zero)
+            {
+                Gizmos.color = Color.red;
+                Vector3 rightPivotWorld = fingerRight.TransformPoint(rightPivotOffset);
+                Gizmos.DrawWireSphere(rightPivotWorld, 0.002f);
+            }
+        }
+
+        // Draw rotation axis at gripper root
+        if (gripperBase != null || transform != null)
+        {
+            Transform root = gripperBase != null ? gripperBase : transform;
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawRay(root.position, root.TransformDirection(rotationAxis) * 0.03f);
         }
     }
 }
