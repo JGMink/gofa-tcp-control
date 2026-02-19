@@ -26,9 +26,9 @@ public class TCPSpeedBridge : MonoBehaviour
     [SerializeField] private float pollInterval = 0.1f;
 
     [Header("Motion Settings")]
-    [SerializeField] private float defaultMaxSpeed    = 1f;
-    [SerializeField] private float defaultAcceleration = 2f; // units/s²
-    [SerializeField] private float defaultDeceleration = 2f; // units/s²
+    [SerializeField] private float defaultMaxSpeed    = 0.5f;
+    [SerializeField] private float defaultAcceleration = 1f; // units/s²
+    [SerializeField] private float defaultDeceleration = 1f; // units/s²
 
     [Header("Speed Profiles (multipliers)")]
     [SerializeField] private SpeedProfile slowlyProfile    = new SpeedProfile(0.3f, 0.5f);
