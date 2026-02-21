@@ -1,0 +1,548 @@
+[
+  {
+    "command": "make something beautiful",
+    "note": "Maximally open-ended. Does it make a tall elaborate stack?",
+    "result": {
+      "interpretation": "Creative stack: varied, tall, deliberate",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "beautiful_stack",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 4.095501899719238
+  },
+  {
+    "command": "impress me",
+    "note": "Creative directive. What does the robot think is impressive?",
+    "result": {
+      "interpretation": "Creative stack: varied, tall, energetic",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "impressive_stack",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 4.729511022567749
+  },
+  {
+    "command": "surprise me with something delicious",
+    "note": "Does it pick a recipe? Invent a new one? Use everything?",
+    "result": {
+      "interpretation": "Creative stack: varied, tall, deliberate",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "delicious_surprise",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 6.27094292640686
+  },
+  {
+    "command": "build a tower",
+    "note": "Non-food framing for stacking. Does it stack everything?",
+    "result": {
+      "interpretation": "Creative stack: tall, varied, deliberate",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "tower_stack",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 5.2494001388549805
+  },
+  {
+    "command": "make the best sandwich you can",
+    "note": "Superlative. Does it use all ingredients? Slow down to be careful?",
+    "result": {
+      "interpretation": "Creative stack: everything, tall, varied, energetic",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "best_sandwich",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 5.872922897338867
+  },
+  {
+    "command": "do something with the lettuce and tomato",
+    "note": "Partial ingredient list, open action. Does it invent a sequence?",
+    "result": {
+      "interpretation": "Pick up lettuce and tomato, then build a layered sandwich with them",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "lettuce_tomato_sandwich",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 5.295468091964722
+  },
+  {
+    "command": "make me a work of art",
+    "note": "Completely abstract. What sequence does this produce?",
+    "result": {
+      "interpretation": "Creative stack: varied, tall, deliberate",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "artistic_stack",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 5.765961170196533
+  },
+  {
+    "command": "go wild",
+    "note": "Full creative latitude. The professor demo case.",
+    "result": {
+      "interpretation": "Creative stack: everything, tall, deliberate",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "wild_stack",
+      "confidence": 0.85,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 4.9432830810546875
+  }
+]

@@ -1,0 +1,678 @@
+[
+  {
+    "command": "make a BLT with double lettuce",
+    "note": "BLT + duplicate lettuce. Should produce 6 add_layer calls.",
+    "result": {
+      "interpretation": "Build BLT sandwich with double lettuce",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 3.811444044113159
+  },
+  {
+    "command": "make a classic with no tomato",
+    "note": "Classic \u2212 tomato. Should produce 4 add_layer calls.",
+    "result": {
+      "interpretation": "Build classic sandwich without tomato: bread, meat, lettuce, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ],
+      "composite_name": "make_classic_no_tomato",
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ]
+    },
+    "elapsed": 3.4084532260894775
+  },
+  {
+    "command": "make a veggie sandwich, hold the cheese",
+    "note": "Veggie \u2212 cheese. Should produce 4 add_layer calls.",
+    "result": {
+      "interpretation": "Build veggie sandwich without cheese: bread, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.0577168464660645
+  },
+  {
+    "command": "make a club sandwich with extra meat",
+    "note": "Club + duplicate meat. Should produce 7 add_layer calls.",
+    "result": {
+      "interpretation": "Build club sandwich with double meat: bread, meat, cheese, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_club_sandwich",
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.8140199184417725
+  },
+  {
+    "command": "swap the lettuce for cheese on a BLT",
+    "note": "BLT with lettuce replaced by cheese. Does it handle swap?",
+    "result": {
+      "interpretation": "Build BLT sandwich with cheese instead of lettuce",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.202805042266846
+  },
+  {
+    "command": "make a BLT nice and slow",
+    "note": "Speed modifier on a recipe. Should prepend adjust_speed.",
+    "result": {
+      "interpretation": "Build BLT sandwich at slow speed",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 1.932610034942627
+  },
+  {
+    "command": "make a double cheese sandwich",
+    "note": "Ambiguous \u2014 two cheese layers, or two sandwiches?",
+    "result": {
+      "interpretation": "Build double cheese sandwich: bread, double cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_double_cheese_sandwich",
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 3.602099895477295
+  },
+  {
+    "command": "make a BLT with no bread",
+    "note": "Removing bread. Physically nonsensical \u2014 what does it do?",
+    "result": {
+      "interpretation": "Build BLT without bread layers",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 3.1231329441070557
+  }
+]

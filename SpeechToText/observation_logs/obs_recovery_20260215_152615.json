@@ -1,0 +1,104 @@
+[
+  {
+    "command": "put it back",
+    "note": "Return held item. Should be return_to_stack(). Context from state?",
+    "result": {
+      "interpretation": "Return the currently held item to its slot",
+      "sequence": [
+        {
+          "instruction": "return_to_slot",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 1.9456729888916016
+  },
+  {
+    "command": "never mind, start over",
+    "note": "Cancel current assembly. Should be clear_assembly().",
+    "result": {
+      "interpretation": "Clear the assembly and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 2.005854845046997
+  },
+  {
+    "command": "I made a mistake, undo that",
+    "note": "Undo last action \u2014 return_to_stack or clear_assembly?",
+    "result": {
+      "interpretation": "Return the currently held item to its slot",
+      "sequence": [
+        {
+          "instruction": "return_to_slot",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 2.3997278213500977
+  },
+  {
+    "command": "stop what you're doing and go home",
+    "note": "Mid-sequence abort + go_home. Watch for emergency_stop confusion.",
+    "result": {
+      "interpretation": "Cancel the current assembly and return the robot arm to the home position",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 2.2546768188476562
+  },
+  {
+    "command": "that's wrong, take the tomato off",
+    "note": "Remove specific item from top of stack \u2014 partial undo?",
+    "result": {
+      "interpretation": "Remove the tomato from the assembly and return it to its slot",
+      "sequence": [
+        {
+          "instruction": "remove_item",
+          "params": {
+            "item": "tomato"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "validated": false,
+      "validation_issues": [
+        "The instruction 'return_to_stack' is not valid. The instruction 'return_to_slot' is not valid."
+      ]
+    },
+    "elapsed": 3.171739101409912
+  }
+]

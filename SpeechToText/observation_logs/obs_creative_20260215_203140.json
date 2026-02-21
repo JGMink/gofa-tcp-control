@@ -1,0 +1,1038 @@
+[
+  {
+    "command": "make something beautiful",
+    "note": "Maximally open-ended. Does it make a tall elaborate stack?",
+    "result": {
+      "interpretation": "Creative open-ended sandwich construction",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Started with a slow, deliberate pace to carefully place each ingredient. Alternated textures and flavors for visual interest \u2014 cheese, tomato, lettuce, meat. Finished with a top slice of bread to complete the sandwich. The asymmetric, open-faced style gives it a more artistic flair compared to a traditional stacked sandwich.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 11.055572032928467
+  },
+  {
+    "command": "impress me",
+    "note": "Creative directive. What does the robot think is impressive?",
+    "result": {
+      "interpretation": "Creative stack with unexpected ingredient combinations and varied speeds",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "I started with a slow, careful base of bread and cheese, then added the meat for protein. Went for a normal speed on the tomato and lettuce to keep them intact, then finished with a fast bread layer on top for an unexpected flourish. The varied speeds and unconventional layering should create an interesting and visually appealing sandwich.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.341296911239624
+  },
+  {
+    "command": "surprise me with something delicious",
+    "note": "Does it pick a recipe? Invent a new one? Use everything?",
+    "result": {
+      "interpretation": "Creative and delicious sandwich stack with varied ingredients and speeds",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": "Started with a base of bread and cheese, then added tomato for a pop of color and acidity. Switched to normal speed for the meat layer, then slowed back down for the delicate lettuce topping. Finished with another bread slice to encase the whole sandwich. The varied speeds and ingredient order create an interesting and appetizing final product.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 5.640699863433838
+  },
+  {
+    "command": "build a tower",
+    "note": "Non-food framing for stacking. Does it stack everything?",
+    "result": {
+      "interpretation": "Creative stack building a tall, asymmetric tower",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.8,
+      "user_feedback": null,
+      "creative_reasoning": "Decided to build an asymmetric, multi-ingredient tower rather than a traditional sandwich. Started slow for precision, sped up for dynamic effect, then slowed down again for the finishing touches. Placed bread, cheese, and meat as a base, then added more varied toppings like tomato and lettuce to create a visually interesting composition.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.080416917800903
+  },
+  {
+    "command": "make the best sandwich you can",
+    "note": "Superlative. Does it use all ingredients? Slow down to be careful?",
+    "result": {
+      "interpretation": "Creative sandwich stack with varied speeds and layering",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.8,
+      "user_feedback": null,
+      "creative_reasoning": "Started slow for precision, then built up the layers at a medium pace. Added a fast final layer for an energetic touch. Varied the speeds to keep the assembly interesting and visually appealing. Placed the bread, cheese, and tomato first as a solid base, then the meat and lettuce for contrast. No strict recipe \u2014 just aimed to create the 'best' sandwich I could with the available ingredients.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.030120134353638
+  },
+  {
+    "command": "do something with the lettuce and tomato",
+    "note": "Partial ingredient list, open action. Does it invent a sequence?",
+    "result": {
+      "interpretation": "Creative stack using lettuce and tomato",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Decided to build a simple open-face sandwich with the tomato and lettuce, keeping the speed slow to handle the delicate ingredients carefully. Bread on the bottom and top to hold it together, but leaving the middle exposed for a unique presentation.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.586693286895752
+  },
+  {
+    "command": "make me a work of art",
+    "note": "Completely abstract. What sequence does this produce?",
+    "result": {
+      "interpretation": "Creative stack with unexpected layer order and varied speed for dramatic effect",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.8,
+      "user_feedback": null,
+      "creative_reasoning": "Started slow and deliberate, then sped up the meat and lettuce layers for contrast. Finished slowly to carefully place the tomato and top bun. Placed the cheese underneath the meat as an unexpected element. This creates a visually interesting and asymmetric sandwich design.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ]
+    },
+    "elapsed": 6.006211757659912
+  },
+  {
+    "command": "go wild",
+    "note": "Full creative latitude. The professor demo case.",
+    "result": {
+      "interpretation": "Creative stack with varied layers and pace changes",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Started slow for precision, sped up mid-build for drama, slowed back down for careful topping. Doubled the meat and cheese for richness. No bread cap \u2014 left it open on purpose.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 7.758171081542969
+  }
+]

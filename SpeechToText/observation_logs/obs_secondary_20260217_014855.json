@@ -1,0 +1,295 @@
+[
+  {
+    "command": "make a BLT every time I say sandwich",
+    "note": "Meta-instruction \u2014 trying to define a new mapping.",
+    "result": {
+      "interpretation": "Define BLT as the default sandwich mapping",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 0.9,
+      "user_feedback": "Mapping noted \u2014 'sandwich' will be saved as an alias for make_blt",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.01892614364624
+  },
+  {
+    "command": "remember this as my usual",
+    "note": "Learning directive without specifying what 'this' is.",
+    "result": {
+      "interpretation": "Define the current assembly as the user's default/usual order",
+      "sequence": [],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": "Mapping/composite noted \u2014 will be saved to memory system",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": []
+    },
+    "elapsed": 0.9538180828094482
+  },
+  {
+    "command": "from now on, careful means use slow speed and go home after",
+    "note": "Trying to define a new composite. Suggests a learned composite?",
+    "result": {
+      "interpretation": "Define a 'careful' composite action that sets slow speed and ends with go_home",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "careful",
+      "confidence": 0.9,
+      "user_feedback": "Mapping/composite noted \u2014 'careful' will be saved as an alias for this sequence",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 7.639679908752441
+  },
+  {
+    "command": "that sequence where you do bread meat cheese bread, call it the classic plus",
+    "note": "Explicit composite definition. Should produce composite_name: classic_plus.",
+    "result": {
+      "interpretation": "Build classic sandwich with extra cheese layer",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_classic_plus_sandwich",
+      "confidence": 0.9,
+      "user_feedback": "Mapping/composite noted \u2014 will be saved to memory system",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.009467124938965
+  },
+  {
+    "command": "do the cheese sandwich but save it as a new sequence",
+    "note": "Explicit learning request. Should suggest composite_name.",
+    "result": {
+      "interpretation": "Build cheese sandwich and save it as a new reusable sequence",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_sandwich",
+      "confidence": 0.9,
+      "user_feedback": "Mapping/composite noted \u2014 will be saved to memory system",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 2.950658082962036
+  }
+]

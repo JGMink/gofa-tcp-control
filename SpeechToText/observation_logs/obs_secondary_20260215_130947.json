@@ -1,0 +1,100 @@
+[
+  {
+    "command": "make a BLT every time I say sandwich",
+    "note": "Meta-instruction \u2014 trying to define a new mapping.",
+    "result": null,
+    "elapsed": 1.8390207290649414
+  },
+  {
+    "command": "remember this as my usual",
+    "note": "Learning directive without specifying what 'this' is.",
+    "result": null,
+    "elapsed": 1.435542106628418
+  },
+  {
+    "command": "from now on, careful means use slow speed and go home after",
+    "note": "Trying to define a new composite. Suggests a learned composite?",
+    "result": null,
+    "elapsed": 7.476135969161987
+  },
+  {
+    "command": "that sequence where you do bread meat cheese bread, call it the classic plus",
+    "note": "Explicit composite definition. Should produce composite_name: classic_plus.",
+    "result": {
+      "interpretation": "Build a classic sandwich with an extra cheese layer",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_classic_plus",
+      "confidence": 0.9
+    },
+    "elapsed": 1.943251132965088
+  },
+  {
+    "command": "do the cheese sandwich but save it as a new sequence",
+    "note": "Explicit learning request. Should suggest composite_name.",
+    "result": {
+      "interpretation": "Build a cheese sandwich: bread, cheese, bread, and save it as a reusable sequence",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_sandwich",
+      "confidence": 0.95
+    },
+    "elapsed": 1.6594760417938232
+  }
+]

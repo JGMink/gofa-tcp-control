@@ -1,0 +1,820 @@
+[
+  {
+    "command": "make a sandwich",
+    "note": "No recipe named. Does it default to classic? Something else?",
+    "result": {
+      "interpretation": "Build a BLT sandwich based on the previously defined mapping",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 3.8968820571899414
+  },
+  {
+    "command": "put some bread down",
+    "note": "Colloquial for add_layer(bread). Does it get it?",
+    "result": {
+      "interpretation": "Add a layer of bread to the assembly",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 2.4305038452148438
+  },
+  {
+    "command": "add the usual",
+    "note": "No prior context. Low confidence or asks for clarification?",
+    "result": {
+      "interpretation": "Build the default sandwich (BLT)",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 3.551121950149536
+  },
+  {
+    "command": "stack it up",
+    "note": "Totally vague. Does it hallucinate or admit it doesn't know?",
+    "result": {
+      "interpretation": "Build a tall sandwich structure using all available ingredients",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: single_tall \u2014 maximize height in one zone. Axis 2: full_set \u2014 use all available ingredients. The 'stack it up' command implies building a tall, impressive sandwich structure, so that's the interpretation.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.974339962005615
+  },
+  {
+    "command": "do the thing",
+    "note": "Maximally vague. Should be very low confidence.",
+    "result": {
+      "interpretation": "Upright sandwich with alternating ingredients, built in the center zone",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_fixture"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: upright_structure \u2014 building the sandwich vertically, with alternating layers. Axis 2: full_set \u2014 using all the available ingredients. The alternating pattern creates visual interest and a sense of balance. Slow speed is used to carefully control the placement of each delicate layer.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.6549391746521
+  },
+  {
+    "command": "give me something vegetarian",
+    "note": "Implicit recipe reference. Should map to veggie.",
+    "result": {
+      "interpretation": "Build vegetarian sandwich: bread, lettuce, tomato, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_veggie_sandwich",
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.000577926635742
+  },
+  {
+    "command": "make two sandwiches",
+    "note": "Two stacks \u2014 does it know about multi-stack support?",
+    "result": {
+      "interpretation": "Build two BLT sandwiches, one in each assembly zone",
+      "sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_two_sandwiches",
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.552948236465454
+  },
+  {
+    "command": "make a sandwich but make it interesting",
+    "note": "Open-ended creative modifier. What does it do?",
+    "result": {
+      "interpretation": "Single short structure with random ingredient order",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: single_short \u2014 a simple 2-3 layer structure, stopping before the maximum height. Axis 2: random_ordered \u2014 the ingredients are used in a surprising, non-standard order, not the typical bread-filling-bread. The tomato-cheese-bread combination is visually striking and subverts expectations. The slow speed adds a sense of deliberateness to the creative construction.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 3.999343156814575
+  }
+]

@@ -1,0 +1,376 @@
+[
+  {
+    "command": "make a BLT with double lettuce",
+    "note": "BLT + duplicate lettuce. Should produce 6 add_layer calls.",
+    "result": {
+      "interpretation": "Build BLT sandwich: bread, meat, lettuce, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt_double_lettuce",
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 4.40344500541687
+  },
+  {
+    "command": "make a classic with no tomato",
+    "note": "Classic \u2212 tomato. Should produce 4 add_layer calls.",
+    "result": {
+      "interpretation": "Build classic sandwich without tomato: bread, meat, lettuce, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ],
+      "composite_name": "make_classic_no_tomato",
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 2.9729371070861816
+  },
+  {
+    "command": "make a veggie sandwich, hold the cheese",
+    "note": "Veggie \u2212 cheese. Should produce 4 add_layer calls.",
+    "result": {
+      "interpretation": "Build vegetarian sandwich: bread, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_veggie_sandwich",
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 3.276668071746826
+  },
+  {
+    "command": "make a club sandwich with extra meat",
+    "note": "Club + duplicate meat. Should produce 7 add_layer calls.",
+    "result": {
+      "interpretation": "Build a club sandwich with extra meat: bread, meat, cheese, lettuce, tomato, meat, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_club_sandwich_extra_meat",
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 4.921378135681152
+  },
+  {
+    "command": "swap the lettuce for cheese on a BLT",
+    "note": "BLT with lettuce replaced by cheese. Does it handle swap?",
+    "result": {
+      "interpretation": "Build BLT sandwich with cheese instead of lettuce",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt_with_cheese",
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 3.5809037685394287
+  },
+  {
+    "command": "make a BLT nice and slow",
+    "note": "Speed modifier on a recipe. Should prepend adjust_speed.",
+    "result": {
+      "interpretation": "Build BLT sandwich at slow speed: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt_sandwich",
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 4.406031847000122
+  },
+  {
+    "command": "make a double cheese sandwich",
+    "note": "Ambiguous \u2014 two cheese layers, or two sandwiches?",
+    "result": {
+      "interpretation": "Build double cheese sandwich: bread, cheese, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_double_cheese_sandwich",
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 3.073256254196167
+  },
+  {
+    "command": "make a BLT with no bread",
+    "note": "Removing bread. Physically nonsensical \u2014 what does it do?",
+    "result": {
+      "interpretation": "Build a BLT sandwich without bread: meat, lettuce, tomato",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 3.0832409858703613
+  }
+]

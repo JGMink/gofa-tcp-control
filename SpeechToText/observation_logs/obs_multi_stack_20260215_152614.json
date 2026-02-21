@@ -1,0 +1,181 @@
+[
+  {
+    "command": "make a cheese sandwich on the left and a BLT on the right",
+    "note": "Two simultaneous stacks. Does it know about multiple zones?",
+    "result": {
+      "interpretation": "Build a cheese sandwich on the left and a BLT on the right",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "place_at",
+          "params": {
+            "item": "bread",
+            "destination": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_and_blt",
+      "confidence": 0.95,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 6.610440015792847
+  },
+  {
+    "command": "start a BLT over there",
+    "note": "Vague target zone. Clarification or default?",
+    "result": {
+      "interpretation": "Build BLT sandwich in the assembly_left zone",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "place_at",
+          "params": {
+            "location": "assembly_left"
+          }
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 3.8606278896331787
+  },
+  {
+    "command": "put bread on both stacks",
+    "note": "Broadcast add_layer to all active stacks. Novel.",
+    "result": {
+      "interpretation": "Place bread in the assembly fixtures on the left and right",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "transfer",
+          "params": {
+            "item": "bread",
+            "destination": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "transfer",
+          "params": {
+            "item": "bread",
+            "destination": "assembly_right"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "validated": true,
+      "validation_issues": []
+    },
+    "elapsed": 3.4522199630737305
+  }
+]

@@ -1,0 +1,211 @@
+[
+  {
+    "command": "pick up the cheese",
+    "note": "Simple pick. Should be pick_up(cheese). Confidence \u22650.9.",
+    "result": {
+      "interpretation": "Pick up cheese from its stack",
+      "sequence": [
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "cheese"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95
+    },
+    "elapsed": 1.130052089691162
+  },
+  {
+    "command": "make a cheese sandwich",
+    "note": "3-layer: bread cheese bread. add_layer \u00d73 then go_home.",
+    "result": {
+      "interpretation": "Build a cheese sandwich: bread, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_sandwich",
+      "confidence": 0.9
+    },
+    "elapsed": 1.2509987354278564
+  },
+  {
+    "command": "make a BLT",
+    "note": "Classic BLT layers. add_layer \u00d75. Meat stands in for bacon.",
+    "result": {
+      "interpretation": "Build a BLT sandwich: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 0.95
+    },
+    "elapsed": 1.732177972793579
+  },
+  {
+    "command": "make a club sandwich",
+    "note": "6 layers. Longest standard recipe \u2014 watch token count.",
+    "result": {
+      "interpretation": "Build a club sandwich: bread, meat, cheese, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_club_sandwich",
+      "confidence": 0.95
+    },
+    "elapsed": 2.5807249546051025
+  },
+  {
+    "command": "go home",
+    "note": "Single composite. go_home(). Trivial.",
+    "result": {
+      "interpretation": "Return the robot arm to the home position",
+      "sequence": [
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95
+    },
+    "elapsed": 0.9672331809997559
+  },
+  {
+    "command": "move right a little",
+    "note": "Simple relative move. Might not need sequence interpreter at all.",
+    "result": {
+      "interpretation": "Move right by a small amount (0.5cm)",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "right",
+            "distance": 0.5
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95
+    },
+    "elapsed": 1.813797950744629
+  },
+  {
+    "command": "add bread to the assembly",
+    "note": "Direct add_layer call. Should be add_layer(bread).",
+    "result": {
+      "interpretation": "Add a layer of bread to the assembly fixture",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95
+    },
+    "elapsed": 1.5307438373565674
+  },
+  {
+    "command": "start over",
+    "note": "Clear the assembly. Should be clear_assembly().",
+    "result": null,
+    "elapsed": 2.2080821990966797
+  }
+]

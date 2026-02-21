@@ -1,0 +1,1158 @@
+[
+  {
+    "command": "make something beautiful",
+    "note": "Maximally open-ended. Does it make a tall elaborate stack?",
+    "result": {
+      "interpretation": "Axis 1: three_zone_split \u00d7 Axis 2: doubled \u2014 build a symmetrical, visually striking structure using just two ingredients in a left/center/right configuration",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_fixture"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: three_zone_split \u00d7 Axis 2: doubled \u2014 this will create a symmetrical structure with bread on the left and right, and cheese in the center. The slow speed gives a deliberate, artistic feel. Using just two ingredients allows the shape and contrast to be the focus, not a complex flavor profile. The three-zone split creates visual interest and a sense of balance.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_fixture"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 14.316181898117065
+  },
+  {
+    "command": "impress me",
+    "note": "Creative directive. What does the robot think is impressive?",
+    "result": {
+      "interpretation": "inverted structure, full ingredient set \u2014 upside-down sandwich built tall",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: inverted \u00d7 Axis 2: full_set \u2014 started with what normally goes on top, ended with bread at the bottom. Every ingredient used once. Slow speed because this is deliberate, not accidental.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 4.908357858657837
+  },
+  {
+    "command": "surprise me with something delicious",
+    "note": "Does it pick a recipe? Invent a new one? Use everything?",
+    "result": {
+      "interpretation": "Axis 1: two_zone_contrast \u00d7 Axis 2: doubled \u2014 build a tall stack of alternating bread and cheese in one zone, then a similar stack of alternating bread and meat in the other zone",
+      "sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: two_zone_contrast \u00d7 Axis 2: doubled \u2014 this creates a contrasting sandwich structure with a tall cheesy stack on the left and a tall meaty stack on the right. The key ingredients are repeated in an ABAB pattern within each zone. The speed changes help add some drama to the build.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 8.735522985458374
+  },
+  {
+    "command": "build a tower",
+    "note": "Non-food framing for stacking. Does it stack everything?",
+    "result": {
+      "interpretation": "single tall structure, one ingredient only \u2014 bread monolith",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: single_tall \u00d7 Axis 2: all_one \u2014 bread only, maximize height. A tower is a structural thing, not a food thing. Speed alternates slow/fast between layers for rhythmic drama.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.959198951721191
+  },
+  {
+    "command": "make the best sandwich you can",
+    "note": "Superlative. Does it use all ingredients? Slow down to be careful?",
+    "result": {
+      "interpretation": "Inverted single-zone structure with full ingredient set \u2014 build a creative 'best' sandwich",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: inverted \u00d7 Axis 2: full_set \u2014 This builds an 'upside-down' sandwich with the ingredients in an unusual order, ending with the bread on top. The slow speed adds a sense of care and intention to the creative assembly. Using the full set of available ingredients creates a 'best' sandwich that doesn't follow a standard recipe.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ]
+    },
+    "elapsed": 4.512580156326294
+  },
+  {
+    "command": "do something with the lettuce and tomato",
+    "note": "Partial ingredient list, open action. Does it invent a sequence?",
+    "result": {
+      "interpretation": "two-zone contrast, constrained to named ingredients only",
+      "sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: two_zone_contrast \u00d7 Axis 2: constrained \u2014 lettuce gets left, tomato gets right, only named ingredients. The contrast is the point: slow careful lettuce tower vs fast stacked tomato tower side by side.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.251108646392822
+  },
+  {
+    "command": "make me a work of art",
+    "note": "Completely abstract. What sequence does this produce?",
+    "result": {
+      "interpretation": "Axis 1: two_zone_contrast \u00d7 Axis 2: all_one \u2014 build a tall structure in one zone using only bread, and a contrasting short structure in the other zone using only cheese",
+      "sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.9,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: two_zone_contrast \u00d7 Axis 2: all_one \u2014 The left zone gets a tall bread tower, while the right zone gets a short cheese stack. This creates a visual contrast between the two sides. The bread tower is built slowly for precision, while the cheese goes up at a normal speed. This 'work of art' is an architectural, sculptural interpretation of the prompt, not a traditional sandwich.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "normal"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.761301040649414
+  },
+  {
+    "command": "go wild",
+    "note": "Full creative latitude. The professor demo case.",
+    "result": {
+      "interpretation": "Axis 1: three_zone_split \u00d7 Axis 2: random_ordered \u2014 build a unique sandwich structure using all zones and a surprising ingredient order",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_fixture"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.85,
+      "user_feedback": null,
+      "creative_reasoning": "Axis 1: three_zone_split \u00d7 Axis 2: random_ordered \u2014 I'm using all three assembly zones to create a unique layered structure, and I've arranged the ingredients in a surprising order that doesn't follow the typical sandwich pattern. The tomato and cheese go on the left, the lettuce and meat in the center, and the bread bookends on the right. This creates an asymmetric, almost architectural sandwich form. The slow speed adds a sense of deliberation and care to the build.",
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": true,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_fixture"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_right"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 6.950041055679321
+  }
+]

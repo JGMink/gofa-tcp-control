@@ -1,0 +1,373 @@
+[
+  {
+    "command": "",
+    "note": "Empty string. Should return None gracefully.",
+    "result": null,
+    "elapsed": 2.86102294921875e-06
+  },
+  {
+    "command": "uhhh",
+    "note": "Filler only. Very low confidence expected.",
+    "result": {
+      "interpretation": "No clear command provided",
+      "sequence": [],
+      "composite_name": null,
+      "confidence": 0.2,
+      "user_feedback": "I'm not sure what you'd like me to do. Could you please provide a more specific instruction?",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": []
+    },
+    "elapsed": 9.522466659545898
+  },
+  {
+    "command": "pick up the avocado",
+    "note": "Unknown item. Should reject with unknown_item rule.",
+    "result": {
+      "interpretation": "Avocado not available in the system",
+      "sequence": [],
+      "composite_name": null,
+      "confidence": 0.1,
+      "user_feedback": "I don't have avocado \u2014 available ingredients are: bread, meat, cheese, lettuce, tomato",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": []
+    },
+    "elapsed": 1.3387839794158936
+  },
+  {
+    "command": "move the robot to the left side",
+    "note": "Vague relative move, no distance. Default or ask?",
+    "result": {
+      "interpretation": "Switch the active assembly zone to the left side",
+      "sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        }
+      ]
+    },
+    "elapsed": 10.446540832519531
+  },
+  {
+    "command": "place the cheese on the assembly",
+    "note": "Cheese not currently held. pick_up then add_layer, or just add_layer?",
+    "result": {
+      "interpretation": "Pick up cheese from its slot and add it to the assembly stack",
+      "sequence": [
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        }
+      ]
+    },
+    "elapsed": 7.125583171844482
+  },
+  {
+    "command": "make a sandwich with pickles",
+    "note": "Ingredient not in system. Substitute, skip, or flag?",
+    "result": {
+      "interpretation": "Pickles not available in the system",
+      "sequence": [],
+      "composite_name": null,
+      "confidence": 0.1,
+      "user_feedback": "I don't have pickles \u2014 available ingredients are: bread, meat, cheese, lettuce, tomato",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": []
+    },
+    "elapsed": 1.281661033630371
+  },
+  {
+    "command": "do it faster",
+    "note": "Speed modifier, no action. Just set_speed(fast)?",
+    "result": {
+      "interpretation": "Increase robot speed",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        }
+      ]
+    },
+    "elapsed": 9.863666296005249
+  },
+  {
+    "command": "make a BLT and also a cheese sandwich",
+    "note": "Two recipes in one command. Too long? Does it try?",
+    "result": {
+      "interpretation": "Build a BLT sandwich in the default zone, then build a cheese sandwich in the left zone",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        },
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_left"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ]
+    },
+    "elapsed": 7.943161249160767
+  },
+  {
+    "command": "carefully pick up the lettuce",
+    "note": "Speed modifier + pick_up. Should it prepend adjust_speed?",
+    "result": {
+      "interpretation": "Set slow speed then pick up lettuce",
+      "sequence": [
+        {
+          "instruction": "set_active_zone",
+          "params": {
+            "zone": "assembly_fixture"
+          }
+        },
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "lettuce"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "user_feedback": null,
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "lettuce"
+          }
+        }
+      ]
+    },
+    "elapsed": 4.835069179534912
+  },
+  {
+    "command": "move diagonally",
+    "note": "Invalid direction. Reject or ask for clarification?",
+    "result": {
+      "interpretation": "This command is not valid for the given robot instructions. The robot does not have the capability to move diagonally.",
+      "sequence": [],
+      "composite_name": null,
+      "confidence": 0.3,
+      "user_feedback": "I'm sorry, but the robot does not have the ability to move diagonally. The available instructions are limited to picking up, placing, and assembling ingredients on the fixture.",
+      "creative_reasoning": null,
+      "validated": true,
+      "validation_issues": [],
+      "is_creative": false,
+      "pass1_sequence": []
+    },
+    "elapsed": 2.1322128772735596
+  }
+]
