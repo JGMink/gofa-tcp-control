@@ -37,14 +37,14 @@ public class GripperTest : MonoBehaviour
         {
             if (leftFinger == null)
             {
-                leftFinger = gripperController.fingerLeft;
-                if (leftFinger != null) Debug.Log($"✓ Auto-found left finger: {leftFinger.name}");
+                leftFinger = gripperController.fingerBaseLeft;
+                if (leftFinger != null) Debug.Log($"✓ Auto-found left finger arm: {leftFinger.name}");
             }
 
             if (rightFinger == null)
             {
-                rightFinger = gripperController.fingerRight;
-                if (rightFinger != null) Debug.Log($"✓ Auto-found right finger: {rightFinger.name}");
+                rightFinger = gripperController.fingerBaseRight;
+                if (rightFinger != null) Debug.Log($"✓ Auto-found right finger arm: {rightFinger.name}");
             }
 
             if (gripperBase == null)
