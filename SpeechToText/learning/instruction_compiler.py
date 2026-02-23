@@ -11,6 +11,7 @@ Implements a von Neumann-style architecture where:
 import json
 import os
 import re
+import time
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -509,10 +510,19 @@ class InstructionExecutor:
     # Scale factor for distances (cm to Unity units)
     DISTANCE_SCALE = 0.01
 
+    # How long to wait for Unity to acknowledge a move (seconds)
+    ACK_TIMEOUT      = 10.0
+    # How often to poll tcp_ack.json while waiting (seconds)
+    ACK_POLL_INTERVAL = 0.05
+
     def __init__(self, compiler: InstructionCompiler, command_queue_file: str = None):
         self.compiler = compiler
         self.command_queue_file = command_queue_file or os.path.join(
             LEARNING_DIR, "..", "..", "UnityProject", "tcp_commands.json"
+        )
+        # Acknowledgement file — Unity writes here after each move completes
+        self.ack_file = self.command_queue_file.replace(
+            "tcp_commands.json", "tcp_ack.json"
         )
 
         # Gripper position in metres (0.0 = closed, 0.11 = fully open — RG2 range)
@@ -561,11 +571,15 @@ class InstructionExecutor:
             self.current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
 
     # ------------------------------------------------------------------
-    # File write — always includes gripper_position
+    # File write + ack-wait
     # ------------------------------------------------------------------
 
     def _write_position_to_file(self, position: Dict):
-        """Write position + current gripper state to the command queue file for Unity."""
+        """
+        Write position + gripper state to tcp_commands.json (fire-and-forget).
+        Used for gripper-only updates where no arm movement occurs and no
+        Unity ack is expected.
+        """
         try:
             output = dict(position)
             output["gripper_position"] = self.gripper_position
@@ -573,6 +587,67 @@ class InstructionExecutor:
                 json.dump(output, f, indent=2)
         except Exception as e:
             print(f"[ERROR] Failed to write position: {e}")
+
+    def _send_and_wait(self, position: Dict) -> Dict:
+        """
+        Write a move command to tcp_commands.json, then poll tcp_ack.json
+        until Unity confirms the move completed (ack timestamp is newer than
+        our write time).  Returns the Unity-confirmed position dict so
+        current_position can be updated from the authoritative source.
+
+        Falls back to the locally-computed position if no ack arrives within
+        ACK_TIMEOUT seconds (simulation mode / Unity not running).
+        """
+        output = dict(position)
+        output["gripper_position"] = self.gripper_position
+
+        # Record write time just before writing so any ack that arrives
+        # after this point is definitely a response to this command.
+        write_time = time.time()
+
+        try:
+            with open(self.command_queue_file, 'w') as f:
+                json.dump(output, f, indent=2)
+        except Exception as e:
+            print(f"[ERROR] Failed to write command: {e}")
+            return output  # fall back to local position
+
+        # ── Poll tcp_ack.json for Unity's acknowledgement ──────────────
+        # Use file mtime to detect a fresh ack: any write to tcp_ack.json
+        # whose mtime is >= write_time is a response to this command.
+        deadline = write_time + self.ACK_TIMEOUT
+        while time.time() < deadline:
+            time.sleep(self.ACK_POLL_INTERVAL)
+            try:
+                if not os.path.exists(self.ack_file):
+                    continue
+
+                ack_mtime = os.path.getmtime(self.ack_file)
+                if ack_mtime < write_time:
+                    continue  # stale ack from a previous command
+
+                with open(self.ack_file, 'r') as f:
+                    ack = json.load(f)
+
+                if ack.get("completed", False):
+                    # Unity confirmed this move — read back the authoritative position
+                    confirmed = ack.get("position", {})
+                    confirmed_pos = {
+                        "x": float(confirmed.get("x", output["x"])),
+                        "y": float(confirmed.get("y", output["y"])),
+                        "z": float(confirmed.get("z", output["z"])),
+                    }
+                    # Sync gripper from ack if Unity echoed it
+                    if "gripper_position" in confirmed:
+                        self.gripper_position = float(confirmed["gripper_position"])
+                    return confirmed_pos
+
+            except (json.JSONDecodeError, OSError):
+                continue  # file mid-write — retry
+
+        # Timeout — Unity not responding (simulation / disconnected)
+        print(f"[WARN] No ack received within {self.ACK_TIMEOUT}s — using local position")
+        return output  # return locally-computed position as fallback
 
     # -------------------------------------------------------------------------
     # Primitive Executors
@@ -593,13 +668,11 @@ class InstructionExecutor:
             print(f"[ERROR] move_to: unknown location '{location}'")
             return False
 
-        # Update state
-        self.current_position = position.copy()
+        # Send command and wait for Unity to confirm arrival
+        confirmed = self._send_and_wait(position)
+        self.current_position = confirmed
         self.compiler.update_state("current_position", location)
-
-        # Write to file
-        self._write_position_to_file(position)
-        print(f"    [EXEC] move_to('{location}') -> {position}")
+        print(f"    [EXEC] move_to('{location}') -> {confirmed}")
         return True
 
     def _execute_move_relative(self, params: Dict) -> bool:
@@ -634,9 +707,10 @@ class InstructionExecutor:
             "z": self.current_position["z"] + delta["z"] * scaled_distance,
         }
 
-        self.current_position = new_position
-        self._write_position_to_file(new_position)
-        print(f"    [EXEC] move_relative('{direction}', {distance}) -> {new_position}")
+        # Send command and wait for Unity to confirm arrival
+        confirmed = self._send_and_wait(new_position)
+        self.current_position = confirmed
+        print(f"    [EXEC] move_relative('{direction}', {distance}) -> {confirmed}")
         return True
 
     def _execute_gripper_open(self, params: Dict) -> bool:

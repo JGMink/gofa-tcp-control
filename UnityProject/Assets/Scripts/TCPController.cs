@@ -23,7 +23,6 @@ public class TCPController : MonoBehaviour
     public bool smoothMovement = true;
 
     private Vector3 targetPosition;
-    private Vector3 targetRotation;
     private float targetGripperPosition;
     private float lastPollTime;
 
@@ -33,9 +32,6 @@ public class TCPController : MonoBehaviour
         public float x;
         public float y;
         public float z;
-        public float rx;  // Rotation X
-        public float ry;  // Rotation Y
-        public float rz;  // Rotation Z
         public float gripper_position;
     }
 
@@ -70,7 +66,6 @@ public class TCPController : MonoBehaviour
 
         // Initialize target to current position
         targetPosition = tcpTransform.position;
-        targetRotation = tcpTransform.eulerAngles;
         targetGripperPosition = gripperController != null ? gripperController.GetCurrentPosition() : 0.11f;
 
         Debug.Log("=== TCP Controller Ready ===");
@@ -92,12 +87,10 @@ public class TCPController : MonoBehaviour
         if (smoothMovement)
         {
             tcpTransform.position = Vector3.Lerp(tcpTransform.position, targetPosition, Time.deltaTime * moveSpeed * 10f);
-            tcpTransform.rotation = Quaternion.Lerp(tcpTransform.rotation, Quaternion.Euler(targetRotation), Time.deltaTime * moveSpeed * 10f);
         }
         else
         {
             tcpTransform.position = targetPosition;
-            tcpTransform.rotation = Quaternion.Euler(targetRotation);
         }
 
         // Update gripper
@@ -121,26 +114,16 @@ public class TCPController : MonoBehaviour
 
             if (cmd != null)
             {
-                // Update targets
                 Vector3 newPosition = new Vector3(cmd.x, cmd.y, cmd.z);
-                Vector3 newRotation = new Vector3(cmd.rx, cmd.ry, cmd.rz);
                 float newGripper = cmd.gripper_position;
 
-                // Check if anything changed
                 bool posChanged = Vector3.Distance(newPosition, targetPosition) > 0.0001f;
-                bool rotChanged = Vector3.Distance(newRotation, targetRotation) > 0.0001f;
                 bool gripperChanged = Mathf.Abs(newGripper - targetGripperPosition) > 0.001f;
 
                 if (posChanged)
                 {
                     targetPosition = newPosition;
                     Debug.Log($"→ TCP move to: {targetPosition}");
-                }
-
-                if (rotChanged)
-                {
-                    targetRotation = newRotation;
-                    Debug.Log($"↻ TCP rotate to: {targetRotation}");
                 }
 
                 if (gripperChanged)
