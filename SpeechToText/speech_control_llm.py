@@ -125,6 +125,8 @@ queue_lock = threading.Lock()
 emergency_halt = threading.Event()
 current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
 position_lock = threading.Lock()
+current_gripper_position = 0.11   # meters: 0.11 = fully open, 0.0 = fully closed (RG2 range)
+gripper_lock = threading.Lock()
 
 # Precise mode state (for --precise flag)
 PRECISE_MODE = False
@@ -712,8 +714,28 @@ def execute_learned_intent(result: dict, original_text: str):
         emergency_shutdown()
         return []
 
-    elif intent == "gripper_open" or intent == "gripper_close":
-        print(f"{get_timestamp()}    [INFO] Gripper commands not yet implemented")
+    elif intent == "gripper_open":
+        global current_gripper_position
+        with gripper_lock:
+            current_gripper_position = 0.11  # fully open
+        save_command_queue()
+        print(f"{get_timestamp()}    [OK] Gripper OPEN → 110mm | written to {COMMAND_QUEUE_FILE}")
+        return []
+
+    elif intent == "gripper_close":
+        global current_gripper_position
+        # Support optional width_mm param: "close to 50mm" → 0.050m
+        width_mm = params.get("width_mm", params.get("distance_mm"))
+        if width_mm is not None:
+            position = min(max(float(width_mm) / 1000.0, 0.0), 0.11)
+            label = f"{float(width_mm):.0f}mm"
+        else:
+            position = 0.0  # fully closed
+            label = "fully closed"
+        with gripper_lock:
+            current_gripper_position = position
+        save_command_queue()
+        print(f"{get_timestamp()}    [OK] Gripper CLOSE → {label} | written to {COMMAND_QUEUE_FILE}")
         return []
 
     # Unknown intent - try simple parser
@@ -958,7 +980,10 @@ def add_positions_to_queue(positions: list):
 
 
 def save_command_queue():
-    """Save only the latest command to JSON file (overwrites previous)."""
+    """Save the latest position + current gripper state to JSON file (overwrites previous)."""
+    with gripper_lock:
+        gripper_pos = current_gripper_position
+
     with open(COMMAND_QUEUE_FILE, 'w') as f:
         if command_queue:
             latest_move = None
@@ -968,12 +993,22 @@ def save_command_queue():
                     break
 
             if latest_move:
-                json.dump(latest_move, f, indent=2)
-                print(f"{get_timestamp()}    Written to JSON: {latest_move}")
+                output = dict(latest_move)
+                output["gripper_position"] = gripper_pos
+                json.dump(output, f, indent=2)
+                print(f"{get_timestamp()}    Written to JSON: pos={latest_move} gripper={gripper_pos*1000:.1f}mm")
             else:
-                json.dump({}, f)
+                # No move yet — write current position + gripper
+                with position_lock:
+                    output = dict(current_position)
+                output["gripper_position"] = gripper_pos
+                json.dump(output, f, indent=2)
         else:
-            json.dump({}, f)
+            # Empty queue — preserve position, update gripper
+            with position_lock:
+                output = dict(current_position)
+            output["gripper_position"] = gripper_pos
+            json.dump(output, f, indent=2)
 
     # Keep detailed log separately
     detailed_file = COMMAND_QUEUE_FILE.replace('.json', '_detailed.json')

@@ -228,9 +228,57 @@
       "confidence": 1.0,
       "usage_count": 0
     },
+    "release": {
+      "intent": "gripper_open",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "let go": {
+      "intent": "gripper_open",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "drop it": {
+      "intent": "gripper_open",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
     "close gripper": {
       "intent": "gripper_close",
       "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "grab": {
+      "intent": "gripper_close",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "grip": {
+      "intent": "gripper_close",
+      "params": {},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "close to 50mm": {
+      "intent": "gripper_close",
+      "params": {"width_mm": 50},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "close to 30mm": {
+      "intent": "gripper_close",
+      "params": {"width_mm": 30},
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "close to 20mm": {
+      "intent": "gripper_close",
+      "params": {"width_mm": 20},
       "confidence": 1.0,
       "usage_count": 0
     },
