@@ -515,11 +515,43 @@ class InstructionExecutor:
             LEARNING_DIR, "..", "..", "UnityProject", "tcp_commands.json"
         )
 
-        # Current position (synced from scene context)
+        # Gripper position in metres (0.0 = closed, 0.11 = fully open — RG2 range)
+        self.gripper_position: float = self._load_gripper_from_file()
+
+        # Current position (synced from scene context, then overridden by live file)
         self._sync_position_from_context()
+        self._sync_position_from_file()
+
+    # ------------------------------------------------------------------
+    # Startup sync helpers
+    # ------------------------------------------------------------------
+
+    def _load_gripper_from_file(self) -> float:
+        """Read gripper_position from tcp_commands.json so we start from the live state."""
+        try:
+            path = self.command_queue_file
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                return float(data.get("gripper_position", 0.11))
+        except Exception:
+            pass
+        return 0.11  # default: fully open
+
+    def _sync_position_from_file(self):
+        """Override context position with the live tcp_commands.json value if available."""
+        try:
+            path = self.command_queue_file
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                if all(k in data for k in ("x", "y", "z")):
+                    self.current_position = {"x": data["x"], "y": data["y"], "z": data["z"]}
+        except Exception:
+            pass  # keep context position on failure
 
     def _sync_position_from_context(self):
-        """Sync current position from scene context."""
+        """Sync current position from scene context (fallback)."""
         state = self.compiler.get_state()
         current_loc = state.get("current_position", "home")
         pos = self.compiler.get_location_position(current_loc)
@@ -528,11 +560,17 @@ class InstructionExecutor:
         else:
             self.current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
 
+    # ------------------------------------------------------------------
+    # File write — always includes gripper_position
+    # ------------------------------------------------------------------
+
     def _write_position_to_file(self, position: Dict):
-        """Write position to the command queue file for Unity."""
+        """Write position + current gripper state to the command queue file for Unity."""
         try:
+            output = dict(position)
+            output["gripper_position"] = self.gripper_position
             with open(self.command_queue_file, 'w') as f:
-                json.dump(position, f, indent=2)
+                json.dump(output, f, indent=2)
         except Exception as e:
             print(f"[ERROR] Failed to write position: {e}")
 
@@ -604,27 +642,32 @@ class InstructionExecutor:
     def _execute_gripper_open(self, params: Dict) -> bool:
         """
         gripper_open() - Open the gripper to release item.
+        Updates gripper_position to fully open and writes to tcp_commands.json.
         """
         state = self.compiler.get_state()
         holding = state.get("holding")
 
         self.compiler.update_state("gripper", "open")
+        self.gripper_position = 0.11  # fully open (110 mm)
 
         if holding:
-            # Item is released at current location
             self.compiler.update_state("holding", None)
             print(f"    [EXEC] gripper_open() - released '{holding}'")
         else:
             print(f"    [EXEC] gripper_open()")
 
+        # Write to file so Unity sees the gripper change immediately
+        self._write_position_to_file(self.current_position)
         return True
 
     def _execute_gripper_close(self, params: Dict) -> bool:
         """
         gripper_close() - Close the gripper to grab item.
         If at an item stack, picks up that item.
+        Writes updated gripper_position to tcp_commands.json.
         """
         self.compiler.update_state("gripper", "closed")
+        self.gripper_position = 0.0  # fully closed
 
         # Check if we're at an item stack
         state = self.compiler.get_state()
@@ -638,9 +681,11 @@ class InstructionExecutor:
                 if item:
                     self.compiler.update_state("holding", item)
                     print(f"    [EXEC] gripper_close() - grabbed '{item}'")
+                    self._write_position_to_file(self.current_position)
                     return True
 
         print(f"    [EXEC] gripper_close()")
+        self._write_position_to_file(self.current_position)
         return True
 
     def _execute_wait(self, params: Dict) -> bool:
