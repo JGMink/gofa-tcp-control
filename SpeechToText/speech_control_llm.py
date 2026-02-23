@@ -418,6 +418,28 @@ def try_sequence_interpreter(text: str):
     if not has_keyword:
         return False, False
 
+    # ── Tier 0: Sequence phrase bank (instant, no API cost) ──────────────
+    if phrase_bank is not None:
+        cached = phrase_bank.sequence_match(text_clean)
+        if not cached:
+            fuzzy = phrase_bank.fuzzy_sequence_match(text_clean)
+            if fuzzy:
+                matched_phrase, cached, confidence = fuzzy
+                print(f"{get_timestamp()} [SEQ] Fuzzy sequence match ({confidence:.2f}) -> '{matched_phrase}'")
+        if cached:
+            print(f"{get_timestamp()} [SEQ] Cached sequence -> {cached['interpretation']} ({len(cached['sequence'])} steps)")
+            learning_stats["sequence_interpretations"] += 1
+            plan = instruction_compiler.compile_sequence(cached["sequence"])
+            if plan and plan.steps:
+                executor = get_executor()
+                success = executor.execute_plan(plan)
+                with position_lock:
+                    current_position = executor.current_position.copy()
+                return success, True
+            else:
+                print(f"{get_timestamp()} [SEQ] Cached sequence failed to compile — falling through to LLM")
+
+    # ── Tier 1: LLM sequence interpretation ────────────────────────────
     print(f"{get_timestamp()} [SEQ] Trying sequence interpreter...")
     start_time = time.time()
 
@@ -455,6 +477,16 @@ def try_sequence_interpreter(text: str):
                             source_phrase=text
                         )
                         learning_stats["composites_learned"] += 1
+
+                    # Also learn as sequence phrase for instant cache on repeat
+                    if phrase_bank is not None and not result.get("is_creative"):
+                        phrase_bank.add_sequence_phrase(
+                            phrase=text,
+                            interpretation=result["interpretation"],
+                            sequence=result["sequence"],
+                            composite_name=composite_name,
+                            confidence=result["confidence"],
+                        )
 
                 return success, True
             else:
@@ -517,32 +549,64 @@ def try_learning_system(text: str):
         learning_stats["fuzzy_matches"] += 1
         return execute_learned_intent(result, text), True
 
-    # Tier 3: LLM interpretation
-    if llm_interpreter is not None:
-        print(f"{get_timestamp()} [LEARN] Querying LLM...")
+    # Tier 2.5: Sequence phrase cache (covers short commands like "start over")
+    cached = phrase_bank.sequence_match(text)
+    if not cached:
+        fuzzy_seq = phrase_bank.fuzzy_sequence_match(text)
+        if fuzzy_seq:
+            matched_phrase, cached, confidence = fuzzy_seq
+            print(f"{get_timestamp()} [LEARN] Fuzzy sequence match ({confidence:.2f}) -> '{matched_phrase}'")
+    if cached:
+        print(f"{get_timestamp()} [LEARN] Cached sequence -> {cached['interpretation']} ({len(cached['sequence'])} steps)")
+        learning_stats["exact_matches"] += 1
+        plan = instruction_compiler.compile_sequence(cached["sequence"])
+        if plan and plan.steps:
+            executor = get_executor()
+            success = executor.execute_plan(plan)
+            with position_lock:
+                current_position = executor.current_position.copy()
+            return [], True
+
+    # Tier 3: Sequence interpreter fallback (unified LLM path)
+    if sequence_interpreter is not None:
+        print(f"{get_timestamp()} [LEARN] Querying sequence interpreter (Tier 3 fallback)...")
         start_time = time.time()
 
         try:
-            llm_result = llm_interpreter.interpret_command(text)
+            seq_result = sequence_interpreter.interpret(text)
             elapsed = time.time() - start_time
 
-            if llm_result:
-                print(f"{get_timestamp()} [LEARN] LLM interpreted ({elapsed:.2f}s) -> {llm_result['intent']}")
-                print(f"{get_timestamp()}         Confidence: {llm_result['confidence']:.2f}")
+            if seq_result and seq_result.get("confidence", 0) >= 0.7:
+                print(f"{get_timestamp()} [LEARN] Interpreted ({elapsed:.2f}s): {seq_result['interpretation']}")
+                print(f"{get_timestamp()}         Confidence: {seq_result['confidence']:.2f}")
                 learning_stats["llm_interpretations"] += 1
 
-                positions = execute_learned_intent(llm_result, text)
+                # Compile and execute through sequence path
+                plan = instruction_compiler.compile_sequence(seq_result["sequence"])
+                if plan and plan.steps:
+                    executor = get_executor()
+                    success = executor.execute_plan(plan)
+                    with position_lock:
+                        current_position = executor.current_position.copy()
 
-                # Learn if confident (even if no movement, e.g. save_named_location)
-                # positions can be [] for valid non-movement commands
-                if llm_interpreter.is_confident(llm_result) and positions is not None:
-                    learn_new_phrase(text, llm_result)
+                    # Learn as sequence phrase for instant cache on repeat
+                    if success and seq_result.get("confidence", 0) >= LLM_CONFIDENCE_THRESHOLD:
+                        if phrase_bank is not None and not seq_result.get("is_creative"):
+                            phrase_bank.add_sequence_phrase(
+                                phrase=text,
+                                interpretation=seq_result["interpretation"],
+                                sequence=seq_result["sequence"],
+                                composite_name=seq_result.get("composite_name"),
+                                confidence=seq_result["confidence"],
+                            )
 
-                return positions if positions else [], True
+                    return [], True  # Execution handled
+                else:
+                    print(f"{get_timestamp()} [LEARN] Failed to compile sequence")
             else:
-                print(f"{get_timestamp()} [LEARN] LLM failed to interpret ({elapsed:.2f}s)")
+                print(f"{get_timestamp()} [LEARN] Low confidence or failed ({elapsed:.2f}s)")
         except Exception as e:
-            print(f"{get_timestamp()} [LEARN] LLM error: {e}")
+            print(f"{get_timestamp()} [LEARN] Sequence interpreter error: {e}")
 
     # Fall through to simple parser
     learning_stats["simple_parser_fallback"] += 1

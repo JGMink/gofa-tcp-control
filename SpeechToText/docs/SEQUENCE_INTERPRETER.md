@@ -19,7 +19,9 @@ It is a **three-pass LLM pipeline** — generation, validation, and conditional 
 ```
 Voice
   └─▶ Azure Speech-to-Text
-        └─▶ Phrase bank (fuzzy match — fast path for known phrases)
+        └─▶ Phrase bank (exact + fuzzy match — fast path for known phrases)
+              │   ↳ modifier-word bypass: commands with modifiers skip
+              │     the cache entirely and fall through to the LLM
               └─▶ Sequence Interpreter  ◀── this document
                     └─▶ Instruction Compiler  (composites → primitives)
                           └─▶ Executor  (primitives → tcp_commands.json)
@@ -30,7 +32,7 @@ Voice
                           └─▶ phrase_bank.json  (learned_aliases)
 ```
 
-The sequence interpreter is only reached if the phrase bank fuzzy match does not return a confident hit. It handles everything the phrase bank can't: novel recipes, creative commands, modifiers, multi-zone builds, recovery, and learning directives.
+The sequence interpreter is only reached if the phrase bank fuzzy match does not return a confident hit (or the modifier-word bypass forces a cache skip). It handles everything the phrase bank can't: novel recipes, creative commands, modifiers, multi-zone builds, recovery, and learning directives.
 
 ---
 
@@ -92,6 +94,12 @@ The LLM is only ever allowed to call composites. The instruction compiler expand
 **Max tokens:** `700`
 **Runs only if:** Pass 1 produced a non-empty sequence
 
+**Pass 2 skip conditions** (validation is bypassed when):
+- Command is creative (`is_creative: true`)
+- Pass 1 confidence ≥ 0.88
+- Sequence matches a known recipe exactly
+- Sequence is empty
+
 **Input to LLM:**
 - The voice command and interpretation from Pass 1
 - The generated sequence from Pass 1
@@ -107,6 +115,12 @@ The LLM is only ever allowed to call composites. The instruction compiler expand
 4. `move_relative` direction must be one of: `right`, `left`, `up`, `down`, `forward`, `backward`
 5. Assembly sequences must use `add_layer`, not `transfer` or `place_at`
 6. `set_active_zone` zone must be one of: `assembly_fixture`, `assembly_left`, `assembly_right`
+
+**Post-validation safety net (Python-level):**
+After Pass 2, Python applies a final cleanup pass regardless of what the LLM returned:
+- `place_at` and `transfer` instructions are converted to `add_layer`
+- Steps with items not in `valid_items` are removed
+- If the sequence ends with `add_layer` and no `go_home`, `go_home()` is auto-appended
 
 **Output from LLM:**
 ```json
@@ -244,9 +258,9 @@ Mapped explicitly in the prompt:
 
 ### Unknown / Impossible Commands
 If an item is not in the system (avocado, pickles, etc.):
-- `sequence: []`
-- `confidence: 0.1`
-- `user_feedback: "I don't have avocado — available ingredients are: bread, meat, cheese, lettuce, tomato"`
+- LLM may substitute the closest available ingredient (e.g. avocado → tomato as "closest juicy topping") or return an empty sequence with low confidence
+- `confidence: 0.1–0.8` depending on how reasonable the substitution is
+- `user_feedback` describes what was done: `"No avocado — picking up tomato as closest match"`
 
 The `user_feedback` field is intended to be spoken or displayed to the user. Shown as an amber banner in the observation app.
 
@@ -262,6 +276,47 @@ Commands that try to define new mappings or name sequences:
 - Zone names: `assembly_fixture` (default/center), `assembly_left`, `assembly_right`
 - Spatial words in commands are mapped: `"left"` → `assembly_left`, `"right"` → `assembly_right`, `"over there"` → `assembly_fixture`
 - Pattern: `set_active_zone("zone")` followed by `add_layer()` calls, then `go_home()`, then `set_active_zone()` for next zone
+
+---
+
+## Phrase Bank Cache — How the Fast Path Works
+
+Before the LLM is called at all, the phrase bank attempts to serve the command from its cache of previously learned sequences. There are two lookup types:
+
+1. **Exact match** — `phrase_bank.sequence_match(phrase)` — literal string lookup, O(1)
+2. **Fuzzy match** — `phrase_bank.fuzzy_sequence_match(phrase)` — `SequenceMatcher.ratio()` over all cached keys, returns the best hit above `FUZZY_MATCH_THRESHOLD`
+
+If either hits, the cached result dict is returned immediately with `_from_cache: true` and no LLM call is made. This is how "make a BLT" returns in ~0ms on repeat.
+
+### Modifier-Word Bypass (Guard 1)
+
+A command that contains modifier words carries intent that a plain cached recipe cannot satisfy. `fuzzy_sequence_match` checks for these tokens **before** doing any fuzzy scoring, and returns `None` immediately if any are found:
+
+| Category | Tokens |
+|----------|--------|
+| Omissions | `no`, `without`, `hold`, `remove`, `skip` |
+| Additions / multipliers | `extra`, `double`, `triple`, `more` |
+| Substitutions | `swap`, `replace`, `instead`, `sub` |
+| Speed modifiers | `slow`, `slowly`, `fast`, `faster`, `quickly` |
+| Adverbial modifiers | `nice and`, `careful`, `gently` |
+| Spatial deictics | `over there`, `right there`, `over here` |
+| `with X` (ingredient append) | `with` — but **not** `with a` (preserved for "with a side of…" style) |
+
+Examples of what this fixes:
+- `"make a classic with no tomato"` → bypasses cache → LLM returns 4-layer sequence (no tomato) ✓
+- `"make a club sandwich with extra meat"` → bypasses cache → LLM returns 8-layer sequence (double meat) ✓
+- `"make a BLT nice and slow"` → bypasses cache → LLM prepends `adjust_speed(slow)` ✓
+- `"make a BLT"` → cache hit as normal → ~0ms ✓
+
+### Pick-Up Item-Noun Guard (Guard 2)
+
+For pick-up style phrases (`pick up the X`, `grab the X`, `carefully pick up the X`), the terminal item word must match exactly — a fuzzy hit on a different item is rejected. This prevents `"pick up the avocado"` from hitting `"carefully pick up the lettuce"` at 0.6 similarity.
+
+The regex covers adverb-prefixed variants:
+```
+^(?:(?:carefully?|gently?|slowly?|quickly?)\s+)?
+ (?:pick\s+up|grab|get|take)\s+(?:the\s+)?(\w+)$
+```
 
 ---
 
@@ -282,6 +337,7 @@ Every call to `interpret()` returns either `None` (empty/trivial input) or a dic
 | `is_creative` | bool | True if command matched creative patterns |
 | `creative_reasoning` | str\|null | LLM's axis choices and explanation (creative commands only) |
 | `raw_response` | str\|null | Raw LLM text if JSON parse failed completely |
+| `_from_cache` | bool | True if result was served from phrase bank (no LLM call made) |
 
 ---
 
@@ -325,6 +381,59 @@ Pricing: $0.25/MTok input · $1.25/MTok output
 | Full 55-case observation suite | 110–165 | ~$0.07–0.10 |
 | 1,000 full suite runs | — | ~$70–100 |
 
+Cache hits (`_from_cache: true`) cost $0.
+
+---
+
+## Known Issues and Tuning Notes
+
+These are areas that currently work but have sharp edges worth watching as the system grows or before integration.
+
+### Fuzzy Match Threshold (0.6) is Aggressive
+
+`FUZZY_MATCH_THRESHOLD = 0.6` in `config.py` is intentionally permissive to catch phrasing variants. As the phrase bank grows with more cached entries, the risk of false positives increases — two different commands can score above 0.6 against each other even if they mean different things.
+
+**Symptoms of threshold being too low:**
+- A modifier command (e.g. `"make a classic with no tomato"`) getting served the wrong base-recipe result from cache
+- A command for one recipe hitting the cache entry for a different recipe
+
+**Current mitigation:** the modifier-word bypass in `fuzzy_sequence_match` intercepts most of these cases before the ratio is even computed. But if new command categories are added that don't contain any bypass tokens, this can resurface.
+
+**Recommendation:** if the phrase bank grows beyond ~50 sequence entries, consider raising `FUZZY_MATCH_THRESHOLD` from `0.6` to `0.75` via the env var and re-running the observation suite to check for regressions. The threshold is intentionally configurable via `.env`:
+```env
+FUZZY_MATCH_THRESHOLD=0.75
+```
+
+### Pick-Up Item Noun Guard Only Covers `pick up / grab / get / take`
+
+The item-noun guard in `fuzzy_sequence_match` (Guard 2) uses a regex that covers the most common pick-up verbs with optional adverb prefixes. If new pick-up style phrases are added to the phrase bank using different verbs (e.g. `"fetch the tomato"`, `"retrieve the cheese"`), those would not be protected and could fuzzy-hit entries with different items.
+
+**Fix if needed:** extend the `_PICKUP_RE` regex in `fuzzy_sequence_match` to include additional verb forms.
+
+### `"make two sandwiches"` Hits Cache as One Sandwich
+
+`"make two sandwiches"` fuzzy-matches `"make a sandwich"` at ratio 0.82, which exceeds the 0.6 threshold and contains no modifier-bypass tokens, so the cache serves a single classic sandwich. The multi-sandwich intent is silently dropped.
+
+**Root cause:** `"two"` / `"a"` word swap doesn't trigger the bypass, and the system has no quantity-awareness in the cache layer.
+
+**Workaround:** add `"make two sandwiches"` as a separate named phrase bank entry, or add `\btwo\b|\bthree\b|\b\d+\b` to the modifier-bypass pattern if quantity words should always go to the LLM.
+
+### Creative Mode Bypass of Pass 2
+
+Creative commands skip Pass 2 validation entirely (`is_creative` short-circuits validation). This means the LLM's creative output is never checked for invalid instruction names or params — it goes straight to the post-validation Python safety net, which only catches `place_at`/`transfer` rewrites and unknown items. Other invalid instructions in creative output would pass through unchecked.
+
+**In practice:** Haiku rarely produces invalid creative sequences. But if a creative command consistently produces executor errors, enable verbose logging and check `pass1_sequence` vs the final `sequence`.
+
+### Phrase Bank Growth and `usage_count` Drift
+
+Every cache hit increments `usage_count` in `phrase_bank.json` and triggers an immediate file save. In high-throughput scenarios (e.g. running the 55-case observation suite repeatedly), this results in many small disk writes per run. The phrase bank file is also getting progressively larger as `usage_count` values grow.
+
+**No functional impact** currently, but worth noting for integration: if the system is being run in a tight loop for automated testing, consider initializing `PhraseBank(auto_save=False)` to suppress mid-session saves.
+
+### `"start a BLT over there"` — Zone Resolution
+
+`"over there"` is listed in the modifier-bypass token list (`over\s+there\b`), so this command now correctly bypasses the cache and reaches the LLM. The LLM currently resolves it to `assembly_fixture` (the default/center zone) since no specific zone can be inferred from `"over there"` alone. In a live integration context with a physical pointing gesture or gaze direction, this would need to be resolved differently.
+
 ---
 
 ## Backburner Items
@@ -336,3 +445,4 @@ Documented in `instruction_set.json → _meta.backburner`:
 - **Partial undo** — removing a specific item from mid-stack requires the executor to track exact item positions and pick from a non-top position. Current model only supports top-of-stack pick.
 - **Feedback channel** — user-facing TTS or text notification for impossible commands. Scaffolded via `user_feedback` field. Full integration with speech output or UI notification pending.
 - **Memory pipeline integration** — secondary commands currently write to `learned_composites` and `phrase_bank.json` via the memory writer, but the phrase bank dispatcher does not yet read `learned_aliases`. Loop needs closing.
+- **Quantity awareness** — commands like "make two sandwiches" or "add three layers of cheese" have no quantity-dispatch mechanism. Currently falls through to a single-instance cache hit or LLM interpretation without repetition logic.

@@ -37,12 +37,13 @@ except ImportError:
 
 from .config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, LLM_CONFIDENCE_THRESHOLD
 from .instruction_compiler import get_compiler, get_executor, InstructionCompiler
+from .phrase_bank import get_phrase_bank
 
 
 # ── Creative command detection ─────────────────────────────────────────────────
 _CREATIVE_PATTERNS = [
     r"\bimpress\b", r"\bgo wild\b", r"\bsurprise\b", r"\bcreative\b",
-    r"\bbeautiful\b", r"\bwork of art\b", r"\bwork of art\b",
+    r"\bbeautiful\b", r"\bwork of art\b",
     r"\bbuild a tower\b", r"\bbest .* can\b", r"\bsomething delicious\b",
     r"\bsomething interesting\b", r"\bmake it interesting\b",
     r"\bsomething beautiful\b", r"\bmake me something\b",
@@ -121,9 +122,148 @@ class SequenceInterpreter:
         self.model = ANTHROPIC_MODEL
         self.compiler = compiler or get_compiler()
 
+        # ── Cached prompt components (rebuilt only when ISA changes) ───────
+        self._cached_context: Optional[str] = None
+        self._cached_system_prompt: Optional[str] = None
+        self._rebuild_cached_prompts()
+        # Auto-invalidate when instruction set changes (e.g. new composite learned)
+        self.compiler.on_change(self.invalidate_cache)
+
+    def _rebuild_cached_prompts(self):
+        """Rebuild cached system prompt from current compiler state."""
+        self._cached_context = self.compiler.get_llm_context()
+        self._cached_system_prompt = self._build_system_prompt()
+
+    def invalidate_cache(self):
+        """Call after learn_composite() to rebuild cached prompts."""
+        self._rebuild_cached_prompts()
+
     # ══════════════════════════════════════════════════════════════════════════
     # PROMPT BUILDERS
     # ══════════════════════════════════════════════════════════════════════════
+
+    def _build_system_prompt(self) -> str:
+        """
+        Build the static system prompt (cached across API calls).
+        Contains: role, instruction set context, output format, rules, examples.
+        Everything EXCEPT the voice command, creative section, and correction hints.
+        """
+        context = self._cached_context or self.compiler.get_llm_context()
+
+        return f"""You are the instruction generator for an ABB GoFa robot arm that builds sandwich assemblies.
+Your job: convert a voice command into a JSON sequence of robot instructions.
+
+{context}
+━━━ OUTPUT FORMAT ━━━
+Return ONLY a JSON object — no explanation, no prose, no markdown fences. Just JSON.
+
+{{
+  "interpretation": "one sentence: what this command means in robot terms",
+  "sequence": [
+    {{"instruction": "instruction_name", "params": {{"param": "value"}}}},
+    ...
+  ],
+  "composite_name": "snake_case_name_if_reusable_else_null",
+  "confidence": 0.95,
+  "user_feedback": null,
+  "creative_reasoning": null
+}}
+
+━━━ RULES ━━━
+1. Use ONLY instructions listed in AVAILABLE INSTRUCTIONS — never invent new ones like move_absolute
+2. For assembly, ALWAYS use add_layer — never transfer or place_at — when adding to a zone
+3. Every complete assembly sequence ends with go_home()
+4. Parameters must be actual values — never placeholders like {{item}}
+5. confidence: 0.9–1.0 clear · 0.7–0.9 interpreted · 0.5–0.7 best-guess · <0.5 very unclear
+6. Always produce a sequence even for unclear commands — make your best interpretation
+7. composite_name: snake_case reusable name if this is worth saving, else null. NEVER set for creative commands.
+8. For fragile items (lettuce, tomato), prepend adjust_speed("slow") unless already slow
+9. MULTI-ZONE: When building in a non-default zone, call set_active_zone("zone") FIRST, then add_layer calls.
+   Zone names: assembly_fixture (default/center), assembly_left, assembly_right
+   Spatial words in ASSEMBLY context: "left" → assembly_left, "right" → assembly_right, "center"/"middle" → assembly_fixture
+   "over there" / no specifier → use assembly_fixture (default)
+   set_active_zone is ONLY for switching assembly build targets — NEVER use it for robot motion.
+   Spatial words like "move right", "shift left", "go forward" → use move_relative, NOT set_active_zone.
+10. Bread can go ANYWHERE in a stack — it is not required only at the ends. Treat it like any other ingredient.
+
+━━━ RECOVERY COMMANDS ━━━
+"put it back" / "undo" → return_to_stack() (no-op if not holding — safe to call always)
+"start over" / "never mind" / "cancel" → clear_assembly() then go_home()
+"take the [item] off" → return_to_stack() as best approximation (note: partial undo not yet supported)
+"I made a mistake" → return_to_stack() if holding, else clear_assembly()
+
+━━━ DIAGONAL / COMPOUND MOVEMENT ━━━
+move_relative direction must be one of: right, left, up, down, forward, backward.
+There are NO compound directions (up_right, forward_left, etc.) — those are INVALID.
+For diagonal movement, decompose into TWO sequential move_relative calls of equal distance.
+Examples:
+  "move diagonally" (no direction specified) → move_relative(forward, 10) + move_relative(right, 10)
+  "move diagonally forward and right" → move_relative(forward, 10) + move_relative(right, 10)
+  "move diagonally up and left" → move_relative(up, 10) + move_relative(left, 10)
+  "move diagonally backward and right" → move_relative(backward, 10) + move_relative(right, 10)
+When only "diagonally" is said with no axes, default to forward + right.
+
+━━━ SPEED + ACTION COMBINED ━━━
+"carefully pick up X" → adjust_speed("slow") then pick_up(X)
+"do it faster" / "speed up" → adjust_speed("fast") with no other action
+"gently" / "nice and slow" / "take your time" → adjust_speed("slow") prepended to sequence
+
+━━━ UNKNOWN INGREDIENTS — SUBSTITUTE, DON'T REFUSE ━━━
+If a command references an item not in the available items list, DO NOT return an empty sequence.
+Instead: pick the closest available item based on the item descriptions (each item lists what it represents),
+substitute it, produce the full sequence using that substitute, and note the swap in user_feedback.
+
+Substitution guide (use item descriptions to reason — these are examples, not exhaustive):
+- avocado, pickle, onion, cucumber, roasted pepper → tomato (juicy/acidic topping)
+- bacon, ham, turkey, chicken, tuna, tofu, falafel → meat (protein layer)
+- spinach, arugula, kale, greens, cabbage → lettuce (leafy green)
+- cheddar, swiss, brie, mozzarella, sauce, spread, hummus → cheese (dairy/soft layer)
+- bun, roll, pita, wrap, sourdough, toast, waffle → bread (starch/base)
+
+user_feedback for substitutions: "I don't have [requested] — using [substitute] as the closest match"
+Keep confidence at 0.75–0.85 for substitutions (you understood the intent, just swapped the tile).
+
+If a command is physically impossible or makes no sense (not just an unknown ingredient):
+- Set confidence low (< 0.4)
+- Set user_feedback explaining the issue
+- Still try to produce the closest valid sequence if possible
+
+━━━ SECONDARY / LEARNING COMMANDS ━━━
+If the command tries to define a new mapping ("make a BLT every time I say sandwich",
+"remember this as my usual", "call it X"):
+- Produce the sequence for the underlying action
+- Set composite_name to the requested name
+- Set user_feedback to "Mapping/composite noted — will be saved to memory system"
+- These will be handled by the memory writer downstream
+
+━━━ EXAMPLES ━━━
+
+Command: "pick up the cheese"
+{{"interpretation": "Pick up cheese from its slot", "sequence": [{{"instruction": "pick_up", "params": {{"item": "cheese"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "make a cheese sandwich"
+{{"interpretation": "Build cheese sandwich: bread, cheese, bread", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_cheese_sandwich", "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "make a cheese sandwich on the left and a BLT on the right"
+{{"interpretation": "Build cheese sandwich at left zone, then BLT at right zone", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "start over"
+{{"interpretation": "Clear the assembly and return home", "sequence": [{{"instruction": "clear_assembly", "params": {{}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "put it back"
+{{"interpretation": "Return held item to its slot (no-op if not holding)", "sequence": [{{"instruction": "return_to_stack", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "carefully pick up the lettuce"
+{{"interpretation": "Set slow speed then pick up lettuce", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "pick_up", "params": {{"item": "lettuce"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
+
+Command: "pick up the avocado"
+{{"interpretation": "No avocado — picking up tomato as closest match (juicy topping)", "sequence": [{{"instruction": "pick_up", "params": {{"item": "tomato"}}}}], "composite_name": null, "confidence": 0.8, "user_feedback": "I don't have avocado — using tomato as the closest match", "creative_reasoning": null}}
+
+Command: "make a BLT every time I say sandwich"
+{{"interpretation": "Define BLT as the default sandwich mapping", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_blt", "confidence": 0.9, "user_feedback": "Mapping noted — 'sandwich' will be saved as an alias for make_blt", "creative_reasoning": null}}
+
+Command: "move diagonally forward and left"
+{{"interpretation": "Diagonal move: forward + left (two sequential moves)", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "forward", "distance": 10}}}}, {{"instruction": "move_relative", "params": {{"direction": "left", "distance": 10}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}"""
 
     def _build_prompt(self, voice_command: str, is_creative: bool = False,
                       correction_hints: List[str] = None) -> str:
@@ -132,7 +272,7 @@ class SequenceInterpreter:
         - is_creative: tells the LLM it has full creative latitude
         - correction_hints: Pass 3 — list of issues from validator to fix
         """
-        context = self.compiler.get_llm_context()
+        context = self._cached_context or self.compiler.get_llm_context()
 
         correction_section = ""
         if correction_hints:
@@ -179,171 +319,37 @@ Use ONLY valid instruction names from the list above. Do not invent new ones.
                     if _compatible_axes(_axis1_choice, _axis2_choice):
                         break
 
-            creative_section = f"""
-━━━ CREATIVE MODE — AXES ━━━
+            creative_section = f"""━━━ CREATIVE MODE — AXES ━━━
 This is a creative/open-ended command. Do NOT produce a standard sandwich (bread-filling-bread).
 
-YOUR ASSIGNED COMBINATION FOR THIS COMMAND:
+  AXIS 1 (spatial structure): {_axis1_choice} → {_axis1_desc}
+  AXIS 2 (ingredient logic): {_axis2_choice} → {_axis2_desc}
 
-  AXIS 1 (spatial structure): {_axis1_choice}
-  → {_axis1_desc}
-
-  AXIS 2 (ingredient logic): {_axis2_choice}
-  → {_axis2_desc}
-
-You MUST follow both axes literally when building the sequence.
-Do not override them. Do not revert to a standard sandwich shape.
-
-Axis 1 construction rules:
-- single_tall: keep adding layers until you would exceed stack capacity. No go_home until the stack is tall.
-- single_short: stop at exactly 2 or 3 layers. Resist the urge to add more.
-- three_zone_split: you MUST call set_active_zone() three times, once per zone.
-- two_zone_contrast: you MUST call set_active_zone() twice. Each zone gets a distinct ingredient set.
-- palindrome: write out your planned sequence first in creative_reasoning, verify it reads the same backwards, THEN generate the JSON steps. If it's not symmetric, fix it before outputting.
-- inverted: the LAST step before go_home() must be add_layer(bread). Bread goes last.
-
-Speed (adjust_speed) is expressive punctuation — use it to add drama, contrast, or rhythm. Optional but encouraged.
-
-In creative_reasoning: state "Axis 1: {_axis1_choice} × Axis 2: {_axis2_choice}" then explain the sequence you built.
+Follow both axes literally. Do not revert to a standard sandwich shape.
+- single_tall: maximize layers. single_short: exactly 2-3 layers.
+- three_zone_split: call set_active_zone() three times. two_zone_contrast: call it twice.
+- palindrome: verify sequence reads identically backwards before outputting.
+- inverted: bread goes LAST (last add_layer before go_home).
+Speed (adjust_speed) adds drama — optional but encouraged.
+Set creative_reasoning to "Axis 1: {_axis1_choice} x Axis 2: {_axis2_choice} — [one sentence]".
 Set composite_name to null. Always produce a non-empty sequence.
 
-━━━ CREATIVE EXAMPLES ━━━
-
-Command: "impress me"
-{{"interpretation": "inverted structure, full ingredient set — upside-down sandwich built tall", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.85, "user_feedback": null, "creative_reasoning": "Axis 1: inverted × Axis 2: full_set — started with what normally goes on top, ended with bread at the bottom. Every ingredient used once. Slow speed because this is deliberate, not accidental."}}
-
-Command: "build a tower"
-{{"interpretation": "single tall structure, one ingredient only — bread monolith", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: single_tall × Axis 2: all_one — bread only, maximize height. A tower is a structural thing, not a food thing. Speed alternates slow/fast between layers for rhythmic drama."}}
-
-Command: "do something with the lettuce and tomato"
-{{"interpretation": "two-zone contrast, constrained to named ingredients only", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": "Axis 1: two_zone_contrast × Axis 2: constrained — lettuce gets left, tomato gets right, only named ingredients. The contrast is the point: slow careful lettuce tower vs fast stacked tomato tower side by side."}}
+Example: "impress me" (inverted x full_set)
+{{"interpretation": "inverted, full set — upside-down sandwich", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.85, "user_feedback": null, "creative_reasoning": "Axis 1: inverted x Axis 2: full_set — every ingredient once, bread last."}}
 """
 
-        prompt = f"""You are the instruction generator for an ABB GoFa robot arm that builds sandwich assemblies.
-Your job: convert a voice command into a JSON sequence of robot instructions.
+        # ── Build user message (dynamic per-call) ──────────────────────────
+        parts = []
 
-{context}
-{correction_section}
-━━━ OUTPUT FORMAT ━━━
-Return ONLY a JSON object — no explanation, no prose, no markdown fences. Just JSON.
+        if correction_section:
+            parts.append(correction_section)
 
-{{
-  "interpretation": "one sentence: what this command means in robot terms",
-  "sequence": [
-    {{"instruction": "instruction_name", "params": {{"param": "value"}}}},
-    ...
-  ],
-  "composite_name": "snake_case_name_if_reusable_else_null",
-  "confidence": 0.95,
-  "user_feedback": null,
-  "creative_reasoning": null
-}}
+        if creative_section:
+            parts.append(creative_section)
 
-━━━ RULES ━━━
-1. Use ONLY instructions listed in AVAILABLE INSTRUCTIONS — never invent new ones like move_absolute
-2. For assembly, ALWAYS use add_layer — never transfer or place_at — when adding to a zone
-3. Every complete assembly sequence ends with go_home()
-4. Parameters must be actual values — never placeholders like {{item}}
-5. confidence: 0.9–1.0 clear · 0.7–0.9 interpreted · 0.5–0.7 best-guess · <0.5 very unclear
-6. Always produce a sequence even for unclear commands — make your best interpretation
-7. composite_name: snake_case reusable name if this is worth saving, else null. NEVER set for creative commands.
-8. For fragile items (lettuce, tomato), prepend adjust_speed("slow") unless already slow
-9. MULTI-ZONE: When building in a non-default zone, call set_active_zone("zone") FIRST, then add_layer calls.
-   Zone names: assembly_fixture (default/center), assembly_left, assembly_right
-   Spatial words in ASSEMBLY context: "left" → assembly_left, "right" → assembly_right, "center"/"middle" → assembly_fixture
-   "over there" / no specifier → use assembly_fixture (default)
-   set_active_zone is ONLY for switching assembly build targets — NEVER use it for robot motion.
-   Spatial words like "move right", "shift left", "go forward" → use move_relative, NOT set_active_zone.
-10. Bread can go ANYWHERE in a stack — it is not required only at the ends. Treat it like any other ingredient.
+        parts.append(f'Command: "{voice_command}"\n\nJSON:')
 
-{creative_section}
-━━━ RECOVERY COMMANDS ━━━
-"put it back" / "undo" → return_to_stack() (no-op if not holding — safe to call always)
-"start over" / "never mind" / "cancel" → clear_assembly() then go_home()
-"take the [item] off" → return_to_stack() as best approximation (note: partial undo not yet supported)
-"I made a mistake" → return_to_stack() if holding, else clear_assembly()
-
-━━━ SPEED + ACTION COMBINED ━━━
-"carefully pick up X" → adjust_speed("slow") then pick_up(X)
-"do it faster" / "speed up" → adjust_speed("fast") with no other action
-"gently" / "nice and slow" / "take your time" → adjust_speed("slow") prepended to sequence
-
-━━━ UNKNOWN INGREDIENTS — SUBSTITUTE, DON'T REFUSE ━━━
-If a command references an item not in the available items list, DO NOT return an empty sequence.
-Instead: pick the closest available item based on the item descriptions (each item lists what it represents),
-substitute it, produce the full sequence using that substitute, and note the swap in user_feedback.
-
-Substitution guide (use item descriptions to reason — these are examples, not exhaustive):
-- avocado, pickle, onion, cucumber, roasted pepper → tomato (juicy/acidic topping)
-- bacon, ham, turkey, chicken, tuna, tofu, falafel → meat (protein layer)
-- spinach, arugula, kale, greens, cabbage → lettuce (leafy green)
-- cheddar, swiss, brie, mozzarella, sauce, spread, hummus → cheese (dairy/soft layer)
-- bun, roll, pita, wrap, sourdough, toast, waffle → bread (starch/base)
-
-user_feedback for substitutions: "I don't have [requested] — using [substitute] as the closest match"
-Keep confidence at 0.75–0.85 for substitutions (you understood the intent, just swapped the tile).
-
-If a command is physically impossible or makes no sense (not just an unknown ingredient):
-- Set confidence low (< 0.4)
-- Set user_feedback explaining the issue
-- Still try to produce the closest valid sequence if possible
-
-━━━ SECONDARY / LEARNING COMMANDS ━━━
-If the command tries to define a new mapping ("make a BLT every time I say sandwich",
-"remember this as my usual", "call it X"):
-- Produce the sequence for the underlying action
-- Set composite_name to the requested name
-- Set user_feedback to "Mapping/composite noted — will be saved to memory system"
-- These will be handled by the memory writer downstream
-
-━━━ EXAMPLES ━━━
-
-Command: "pick up the cheese"
-{{"interpretation": "Pick up cheese from its slot", "sequence": [{{"instruction": "pick_up", "params": {{"item": "cheese"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "make a cheese sandwich"
-{{"interpretation": "Build cheese sandwich: bread, cheese, bread", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_cheese_sandwich", "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "make a cheese sandwich on the left and a BLT on the right"
-{{"interpretation": "Build cheese sandwich at left zone, then BLT at right zone", "sequence": [{{"instruction": "set_active_zone", "params": {{"zone": "assembly_left"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "cheese"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}, {{"instruction": "set_active_zone", "params": {{"zone": "assembly_right"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "move right a little"
-{{"interpretation": "Nudge TCP right by 1cm", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "right", "distance": 1.0}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "shift forward a lot"
-{{"interpretation": "Move TCP forward 5cm", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "forward", "distance": 5.0}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "move diagonally forward and right"
-{{"interpretation": "Diagonal move — forward then right, 1cm each", "sequence": [{{"instruction": "move_relative", "params": {{"direction": "forward", "distance": 1.0}}}}, {{"instruction": "move_relative", "params": {{"direction": "right", "distance": 1.0}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "start over"
-{{"interpretation": "Clear the assembly and return home", "sequence": [{{"instruction": "clear_assembly", "params": {{}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "put it back"
-{{"interpretation": "Return held item to its slot (no-op if not holding)", "sequence": [{{"instruction": "return_to_stack", "params": {{}}}}], "composite_name": null, "confidence": 0.9, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "do it faster"
-{{"interpretation": "Increase robot speed", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "fast"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "carefully pick up the lettuce"
-{{"interpretation": "Set slow speed then pick up lettuce", "sequence": [{{"instruction": "adjust_speed", "params": {{"modifier": "slow"}}}}, {{"instruction": "pick_up", "params": {{"item": "lettuce"}}}}], "composite_name": null, "confidence": 0.95, "user_feedback": null, "creative_reasoning": null}}
-
-Command: "pick up the avocado"
-{{"interpretation": "No avocado — picking up tomato as closest match (juicy topping)", "sequence": [{{"instruction": "pick_up", "params": {{"item": "tomato"}}}}], "composite_name": null, "confidence": 0.8, "user_feedback": "I don't have avocado — using tomato as the closest match", "creative_reasoning": null}}
-
-Command: "make me a BLT with pickles"
-{{"interpretation": "BLT with pickles substituted as tomato (juicy/acidic topping)", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": null, "confidence": 0.8, "user_feedback": "I don't have pickles — using tomato as the closest match", "creative_reasoning": null}}
-
-Command: "make a BLT every time I say sandwich"
-{{"interpretation": "Define BLT as the default sandwich mapping", "sequence": [{{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "add_layer", "params": {{"item": "meat"}}}}, {{"instruction": "add_layer", "params": {{"item": "lettuce"}}}}, {{"instruction": "add_layer", "params": {{"item": "tomato"}}}}, {{"instruction": "add_layer", "params": {{"item": "bread"}}}}, {{"instruction": "go_home", "params": {{}}}}], "composite_name": "make_blt", "confidence": 0.9, "user_feedback": "Mapping noted — 'sandwich' will be saved as an alias for make_blt", "creative_reasoning": null}}
-
-Now interpret this command:
-
-Command: "{voice_command}"
-
-JSON:"""
-
-        return prompt
+        return "\n".join(parts)
 
     def _build_validation_prompt(self, voice_command: str, raw_sequence: List[Dict],
                                   interpretation: str) -> str:
@@ -457,19 +463,40 @@ JSON:"""
         if not voice_command or len(voice_command.strip()) < 2:
             return None
 
+        # ── Tier 0: Sequence phrase bank (instant, no API cost) ──────────
+        try:
+            pb = get_phrase_bank()
+            cached = pb.sequence_match(voice_command)
+            if not cached:
+                fuzzy = pb.fuzzy_sequence_match(voice_command)
+                if fuzzy:
+                    matched_phrase, cached, confidence = fuzzy
+                    print(f"[SEQ] Fuzzy phrase-bank hit ({confidence:.2f}) -> '{matched_phrase}'")
+            if cached:
+                print(f"[SEQ] Phrase-bank hit -> {cached['interpretation']}")
+                return cached
+        except Exception as e:
+            print(f"[SEQ] Phrase bank lookup error (non-fatal): {e}")
+
         creative = _is_creative(voice_command)
         temperature = 1.0 if creative else 0
 
         # ── Pass 1: Generation ────────────────────────────────────────────────
         raw_response_text = ""
         try:
-            prompt = self._build_prompt(voice_command, is_creative=creative)
+            user_message = self._build_prompt(voice_command, is_creative=creative)
+            max_tok = 900 if creative else 400
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=900,
+                max_tokens=max_tok,
                 temperature=temperature,
                 timeout=30,
-                messages=[{"role": "user", "content": prompt}]
+                system=[{
+                    "type": "text",
+                    "text": self._cached_system_prompt,
+                    "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                }],
+                messages=[{"role": "user", "content": user_message}],
             )
             raw_response_text = response.content[0].text.strip()
         except Exception as e:
@@ -525,6 +552,7 @@ JSON:"""
         # ── Pass 2: Validation ────────────────────────────────────────────────
         # Python-side pre-check: catch obvious structural problems without an LLM call.
         # If any of these fire, Pass 2 is warranted. Otherwise we skip it.
+        _VALID_DIRECTIONS = {"right", "left", "up", "down", "forward", "backward"}
         def _python_issues(seq: list) -> list:
             issues = []
             valid_instructions = set(self.compiler.get_instruction_list_for_prompt().split(", "))
@@ -537,6 +565,23 @@ JSON:"""
                     item = step.get("params", {}).get("item", "")
                     if item and item not in valid_items:
                         issues.append(f"unknown item: {item}")
+                if inst == "move_relative":
+                    direction = step.get("params", {}).get("direction", "")
+                    if direction and direction not in _VALID_DIRECTIONS:
+                        issues.append(
+                            f"invalid move_relative direction: '{direction}' — "
+                            f"valid directions are {sorted(_VALID_DIRECTIONS)}. "
+                            f"Diagonal moves must be decomposed into two sequential "
+                            f"move_relative calls (e.g. forward + right)"
+                        )
+                if inst in ("place_at", "transfer"):
+                    # place_at/transfer are almost always wrong in this system;
+                    # add_layer is the correct instruction for placing items
+                    issues.append(
+                        f"used {inst} — use add_layer instead. "
+                        f"place_at/transfer should be replaced with "
+                        f"add_layer(item) for placing items on the assembly"
+                    )
             return issues
 
         def _matches_known_recipe(seq: list) -> bool:
@@ -599,7 +644,14 @@ JSON:"""
             result["validation_issues"] = []
 
         # ── Pass 3: Regeneration (if validator found fixable issues) ──────────
+        # Re-run Python checks on the post-P2 sequence; if the LLM validator
+        # failed to fix issues that _python_issues originally caught, feed
+        # those issues into Pass 3 as correction hints.
         issues_after_p2 = result.get("validation_issues", [])
+        _py_issues_p2 = _python_issues(result["sequence"]) if result.get("sequence") else []
+        if _py_issues_p2:
+            issues_after_p2 = list(set(issues_after_p2 + _py_issues_p2))
+            print(f"[SEQ] Python re-check after P2 found {len(_py_issues_p2)} remaining issue(s)")
         if issues_after_p2 and not result.get("raw_response"):
             # Only retry if there were real structural issues (not just "unparseable")
             real_issues = [i for i in issues_after_p2
@@ -607,17 +659,22 @@ JSON:"""
             if real_issues:
                 print(f"[SEQ] Pass 3: regenerating with {len(real_issues)} correction hint(s)")
                 try:
-                    p3_prompt = self._build_prompt(
+                    p3_user = self._build_prompt(
                         voice_command,
                         is_creative=creative,
                         correction_hints=real_issues
                     )
                     p3_response = self.client.messages.create(
                         model=self.model,
-                        max_tokens=900,
+                        max_tokens=400,
                         temperature=0,  # Correction pass always deterministic
                         timeout=30,
-                        messages=[{"role": "user", "content": p3_prompt}]
+                        system=[{
+                            "type": "text",
+                            "text": self._cached_system_prompt,
+                            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                        }],
+                        messages=[{"role": "user", "content": p3_user}],
                     )
                     p3_text = p3_response.content[0].text.strip()
                     p3_result = self._parse_json_response(p3_text)
@@ -639,6 +696,67 @@ JSON:"""
                 except Exception as e:
                     print(f"[SEQ] Pass 3 failed: {e}")
                     # Non-fatal — keep Pass 2 result
+
+        # ── Post-validation safety net ───────────────────────────────────
+        # Fix issues that the LLM/validator may have left behind.
+        seq = result.get("sequence", [])
+        if seq:
+            valid_items = set(self.compiler.get_items().keys())
+            changed = False
+
+            # 0. Convert place_at/transfer → add_layer (final backstop)
+            #    Extract the item from the voice command if the params don't have one
+            cmd_lower = voice_command.lower()
+            for i, step in enumerate(seq):
+                inst = step.get("instruction", "")
+                if inst in ("place_at", "transfer"):
+                    # Try to infer item from the voice command
+                    inferred_item = None
+                    for item_name in valid_items:
+                        if item_name in cmd_lower:
+                            inferred_item = item_name
+                            break
+                    if inferred_item:
+                        seq[i] = {"instruction": "add_layer",
+                                  "params": {"item": inferred_item}}
+                        print(f"[SEQ] Post-fix: {inst} -> add_layer({inferred_item})")
+                        changed = True
+                    else:
+                        print(f"[SEQ] Post-fix: removing {inst} (can't infer item)")
+                        seq[i] = None
+                        changed = True
+            if changed:
+                seq = [s for s in seq if s is not None]
+                # Also remove set_active_zone that was only there for the place_at
+                if (len(seq) == 1 and seq[0].get("instruction") == "set_active_zone"):
+                    seq = []
+                result["sequence"] = seq
+
+            # 1. Scrub invalid items from add_layer steps (e.g. "pickles")
+            scrubbed = []
+            for step in seq:
+                if step.get("instruction") == "add_layer":
+                    item = step.get("params", {}).get("item", "")
+                    if item and item not in valid_items:
+                        print(f"[SEQ] Post-scrub: removing add_layer({item}) — not a valid item")
+                        continue
+                scrubbed.append(step)
+            if len(scrubbed) != len(seq):
+                result["sequence"] = scrubbed
+                seq = scrubbed
+
+            # 2. Auto-append go_home() on complete assembly sequences
+            #    Heuristic: ≥3 add_layer steps AND last add_layer is bread
+            #    AND no go_home already present → looks like a finished recipe
+            instructions = [s.get("instruction") for s in seq]
+            add_layers = [s for s in seq if s.get("instruction") == "add_layer"]
+            has_go_home = "go_home" in instructions
+            if (len(add_layers) >= 3
+                    and not has_go_home
+                    and add_layers[-1].get("params", {}).get("item") == "bread"):
+                seq.append({"instruction": "go_home", "params": {}})
+                result["sequence"] = seq
+                print(f"[SEQ] Post-fix: appended go_home() to complete assembly")
 
         return result
 

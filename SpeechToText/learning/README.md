@@ -1,284 +1,205 @@
-# LLM-Based Voice Command Interpreter
+# Learning Module — Voice Command Interpretation
 
-This module provides an alternative to rule-based parsing using Large Language Models (LLMs) for interpreting natural language voice commands.
-
-## Overview
-
-The LLM interpreter uses Anthropic's Claude API to parse voice commands into robot movement deltas. This approach offers several advantages over rule-based parsing:
-
-- **Natural Language Understanding**: Handles variations in phrasing more flexibly
-- **Context Awareness**: Better understanding of complex multi-step commands
-- **Extensibility**: Easy to add new command types without writing regex patterns
+This module handles all LLM-based voice command interpretation for the GoFa robot arm. It converts natural language speech into structured robot instruction sequences via a self-learning phrase bank and a three-pass Claude pipeline.
 
 ## Architecture
 
 ```
 Voice Input (Azure Speech-to-Text)
     ↓
-Text Command (e.g., "move right 5 centimeters")
+Text Command (e.g., "make a BLT with double lettuce")
     ↓
-LLM Interpreter (Claude API)
+Phrase Bank  (exact + fuzzy match — fast path for known phrases)
+    │  modifier-word bypass: phrases with modifiers skip cache → LLM
     ↓
-Structured Deltas [{"x": 0.05, "y": 0.0, "z": 0.0}]
+Sequence Interpreter  (three-pass LLM pipeline)
     ↓
-Position Calculation
+Instruction Compiler  (composites → primitives)
     ↓
-TCP Command Queue (JSON file)
+Executor → tcp_commands.json
     ↓
-Unity Controller
-    ↓
-Robot Movement
+Unity / RobotStudio / ABB GoFa
 ```
+
+**Fast path:** If the phrase bank has a confident match for the command, the LLM is never called. A cached `"make a BLT"` returns in ~0ms. Commands with modifier words (`no`, `with`, `extra`, `slow`, etc.) automatically bypass the cache so the LLM can handle the variation correctly.
+
+**LLM path:** Novel commands, creative instructions, modifier variations, and multi-zone builds are handled by `sequence_interpreter.py` using a three-pass pipeline (generation → validation → optional regeneration).
+
+---
 
 ## Files
 
-- **`llm_interpreter.py`**: Main LLM interpreter class
-- **`config.py`**: Configuration constants and environment variables
-- **`phrase_bank.json`**: Example commands and direction mappings for few-shot learning
-- **`phrase_bank.py`**: Utilities for managing the phrase bank (future expansion)
+| File | Purpose |
+|------|---------|
+| `sequence_interpreter.py` | Three-pass LLM pipeline — converts voice commands to instruction sequences |
+| `instruction_compiler.py` | Expands composite instructions into primitive robot calls |
+| `phrase_bank.py` | Phrase bank manager — fuzzy matching, cache read/write, modifier-word bypass |
+| `phrase_bank.json` | Live phrase bank data — grows at runtime as commands are learned |
+| `config.py` | API keys, model selection, thresholds (fuzzy match, LLM confidence) |
+| `memory_writer.py` | Writes learned composites and aliases back to `instruction_set.json` / `phrase_bank.json` |
 
-## Usage
-
-### Basic Usage
-
-```python
-from learning.llm_interpreter import LLMInterpreter
-
-# Initialize interpreter
-interpreter = LLMInterpreter()
-
-# Parse a single command
-deltas = interpreter.parse_command("move right 5 centimeters")
-# Returns: [{"x": 0.05, "y": 0.0, "z": 0.0}]
-
-# Parse with position context
-current_pos = {"x": 0.0, "y": 0.0, "z": 0.0}
-positions = interpreter.parse_command_with_context(
-    "go left 3 cm then move up 2 cm",
-    current_pos
-)
-# Returns: [
-#   {"x": -0.03, "y": 0.0, "z": 0.0},
-#   {"x": -0.03, "y": 0.02, "z": 0.0}
-# ]
-```
-
-### Full Integration
-
-The `SpeechToText_learning.py` script provides a complete implementation:
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
-
-# Run the LLM-based speech recognizer
-python SpeechToText_learning.py
-```
-
-### Testing Without Speech
-
-Use the standalone test script to verify LLM parsing without microphone:
-
-```bash
-# Run automated tests
-python test_llm_only.py
-
-# Interactive testing
-python test_llm_only.py --interactive
-```
+---
 
 ## Configuration
 
-### Environment Variables
-
-Add these to your `.env` file:
+### Environment Variables (`.env` in `SpeechToText/`)
 
 ```env
 # Required
 ANTHROPIC_API_KEY=your_api_key_here
 
-# Optional (defaults shown)
-ANTHROPIC_MODEL=claude-3-5-haiku-20241022
+# Optional — defaults shown
+ANTHROPIC_MODEL=claude-3-haiku-20240307
+FUZZY_MATCH_THRESHOLD=0.6
+LLM_CONFIDENCE_THRESHOLD=0.80
+VERBOSE_LOGGING=false
 ```
 
-### Model Selection
+### Key Config Values (`config.py`)
 
-The default model is **Claude 3.5 Haiku**, chosen for:
-- **Speed**: Fast response times (~1-2 seconds)
-- **Cost**: Lowest cost option (~$0.25 per million tokens)
-- **Accuracy**: Sufficient for structured parsing tasks
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_MODEL` | `claude-3-haiku-20240307` | Model used for all LLM calls |
+| `FUZZY_MATCH_THRESHOLD` | `0.6` | Minimum ratio for a phrase bank fuzzy hit (see Known Issues) |
+| `LLM_CONFIDENCE_THRESHOLD` | `0.80` | Minimum confidence for auto-saving a learned composite |
+| `DISTANCE_SCALE` | `0.01` | Centimeters → Unity units conversion |
+| `VERBOSE_LOGGING` | `false` | Enables detailed pipeline step logging |
 
-You can change the model in `config.py`:
+---
 
-```python
-ANTHROPIC_MODEL = "claude-3-5-haiku-20241022"  # Fast and cheap (recommended)
-# ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"  # More capable but slower/pricier
+## Running the Observation Suite
+
+The observation suite runs all 55 test cases across 8 categories and saves results to `observation_logs/`.
+
+```bash
+# Run all categories
+~/miniconda3/bin/python run_observations.py --category all --save
+
+# Run a specific category
+~/miniconda3/bin/python run_observations.py --category modifiers --save
 ```
 
-### Distance Scale
+**Categories:** `baseline`, `ambiguous`, `modifiers`, `multi_stack`, `recovery`, `edge`, `creative`, `secondary`
 
-The `DISTANCE_SCALE` parameter converts centimeters to Unity units:
+**Python note:** The Anthropic SDK must be installed in the Python environment used. Use `~/miniconda3/bin/python` if the system Python doesn't have it.
 
-```python
-DISTANCE_SCALE = 0.01  # 1 cm = 0.01 Unity units
-```
-
-Adjust this in `config.py` to match your robot's coordinate system.
-
-## Coordinate System
-
-The interpreter uses the following coordinate mapping:
-
-| Axis | Positive Direction | Negative Direction |
-|------|-------------------|--------------------|
-| X    | Right             | Left               |
-| Y    | Up                | Down               |
-| Z    | Forward           | Backward           |
-
-## Supported Commands
-
-### Direction Keywords
-
-- **Right/Left**: `right`, `left`
-- **Up/Down**: `up`, `upward`, `down`, `downward`
-- **Forward/Backward**: `forward`, `ahead`, `backward`, `back`
-
-### Distance Specifications
-
-- **Explicit**: "5 centimeters", "10 cm", "7 millimeters"
-- **Implicit**: "move right" (uses default 1 cm)
-- **Qualitative**: "a little bit", "slightly" (uses 0.5 cm)
-
-### Multi-Command Sentences
-
-The LLM naturally handles compound commands:
-
-- "move right **and** go up 5 centimeters"
-- "go left 3 cm **then** move down 2 cm"
-- "move forward 10 cm**,** then go right 5 cm**,** then move up 3 cm"
-
-## Cost Optimization
-
-To minimize API costs:
-
-1. **Use Haiku Model**: The default Claude 3.5 Haiku is 10x cheaper than Sonnet
-2. **Short Prompts**: Uses only 4 few-shot examples (~200 tokens)
-3. **Limited Output**: Max tokens set to 200 (typical response is ~30 tokens)
-4. **Temperature 0**: Deterministic responses reduce variability
-
-### Estimated Costs
-
-Assuming average command is 300 tokens total (input + output):
-
-- **Haiku**: ~$0.075 per 1000 commands
-- **10,000 commands**: ~$0.75
-- **Typical session (50 commands)**: ~$0.004 (less than half a cent)
+---
 
 ## Phrase Bank
 
-The `phrase_bank.json` file contains:
+`phrase_bank.json` has two sections:
 
-1. **Example Commands**: Few-shot learning examples
-2. **Direction Mappings**: Keyword-to-axis mappings (for future hybrid approaches)
+### `phrases`
+Simple single-intent lookups (movement, speed, gripper). Used by `fuzzy_match()` in the legacy `llm_interpreter` path.
 
-### Adding Examples
+### `sequence_phrases`
+Full LLM-compatible result dicts for multi-step commands. Keyed by normalized phrase string (lowercase, stripped). Each entry stores the full sequence, `composite_name`, `confidence`, and `usage_count`.
 
-To improve parsing for specific command patterns, add examples to `phrase_bank.json`:
+**Cache grows at runtime** — every time the LLM generates a result with `composite_name` set and `confidence ≥ LLM_CONFIDENCE_THRESHOLD`, the phrase is added to `sequence_phrases`. On the next run of the same command, it's served from cache with `_from_cache: true` at ~0ms.
 
-```json
-{
-  "example_commands": [
-    {
-      "input": "your new command pattern",
-      "output": [{"x": 0.0, "y": 0.0, "z": 0.0}]
-    }
-  ]
-}
+**Modifier-word bypass** — `fuzzy_sequence_match()` checks the input phrase for modifier tokens before doing any fuzzy scoring. If found, it returns `None` immediately, bypassing the cache entirely so the LLM receives the full modified command. This prevents stale base-recipe cache entries from swallowing modifier commands like `"make a classic with no tomato"`.
+
+---
+
+## Supported Command Types
+
+### Standard Recipes
+Named recipes with optional modifiers:
+- `"make a BLT"` → bread, meat, lettuce, tomato, bread + go_home
+- `"make a club sandwich with extra meat"` → club recipe with double meat layer
+- `"make a veggie sandwich, hold the cheese"` → veggie recipe with cheese omitted
+- `"make a BLT nice and slow"` → `adjust_speed(slow)` prepended to BLT sequence
+
+### Pick-Up / Placement
+- `"pick up the cheese"` → `pick_up(item='cheese')`
+- `"carefully pick up the lettuce"` → `adjust_speed(slow)` + `pick_up(item='lettuce')`
+- `"put some bread down"` → `add_layer(item='bread')`
+
+### Recovery
+- `"put it back"` / `"undo"` → `return_to_stack()`
+- `"start over"` / `"never mind"` / `"cancel"` → `clear_assembly()` + `go_home()`
+- `"I made a mistake"` → `return_to_stack()` + `clear_assembly()`
+
+### Multi-Zone Builds
+- `"make a cheese sandwich on the left and a BLT on the right"` → `set_active_zone` + sequences per zone
+- `"start a BLT over there"` → defaults to center zone (`assembly_fixture`)
+
+### Creative Commands
+Open-ended creative directives use a two-axis composition system (spatial structure × ingredient logic) with temperature 1.0:
+- `"go wild"`, `"impress me"`, `"make something beautiful"`, `"build a tower"`, etc.
+
+### Learning / Secondary Commands
+Meta-commands that try to define or name sequences:
+- `"from now on, careful means slow speed and go home after"` → suggests `careful_macro` composite
+- `"call this sequence 'classic plus'"` → generates the sequence and tags it with the requested name
+
+### Unknown Items
+Items not in the system (avocado, pickles, etc.) prompt either a substitution or an empty sequence with `user_feedback` explaining the issue.
+
+---
+
+## Cost
+
+Model: `claude-3-haiku-20240307` — $0.25/MTok input · $1.25/MTok output
+
+| Scenario | LLM calls | Approx cost |
+|----------|-----------|-------------|
+| Cache hit | 0 | $0.00 |
+| Standard command (Pass 1 + 2) | 2 | ~$0.001–0.002 |
+| Command with Pass 3 correction | 3 | ~$0.002–0.003 |
+| Full 55-case observation suite | 110–165 | ~$0.07–0.10 |
+
+---
+
+## Known Issues and Tuning Notes
+
+### Fuzzy Threshold (0.6) Can Cause Cache Collisions as Phrase Bank Grows
+
+At the default `FUZZY_MATCH_THRESHOLD=0.6`, two phrases with similar structure but different intent can fuzzy-match at runtime. As more recipes are cached, the probability of false hits increases.
+
+**Current mitigation:** the modifier-word bypass catches most problem cases. But if you observe modifier commands returning wrong cached results, raise the threshold:
+
+```env
+FUZZY_MATCH_THRESHOLD=0.75
 ```
 
-The interpreter uses the first 4 examples for few-shot learning.
+Then re-run `run_observations.py --category modifiers` to verify no regressions.
 
-## Error Handling
+### `"make two sandwiches"` Returns One Sandwich
 
-The interpreter handles various error cases:
+The word `"two"` is not in the modifier-bypass list, so `"make two sandwiches"` fuzzy-matches `"make a sandwich"` at 0.82 and returns the cached single classic. The multi-sandwich intent is silently dropped.
 
-- **JSON Parsing Errors**: Returns `None` if LLM output isn't valid JSON
-- **Invalid Structure**: Validates delta objects have x, y, z fields
-- **API Errors**: Catches and logs Anthropic API exceptions
-- **Missing API Key**: Raises clear error on initialization
+To fix for a specific case: add `"make two sandwiches"` as its own phrase bank entry, or add quantity words to the bypass pattern in `phrase_bank.py`.
 
-## Logging
+### Creative Commands Skip Pass 2 Validation
 
-The main script logs all recognitions to `asr_llm_log.jsonl`:
+Creative commands bypass the LLM validator entirely. The post-validation Python safety net still runs (catches `place_at`/`transfer` and unknown items), but instruction name errors in creative output would pass through. In practice this is rarely an issue with Haiku, but worth keeping in mind if creative outputs cause executor errors.
 
-```json
-{
-  "timestamp": "2025-01-22T10:30:45.123456",
-  "text": "move right 5 centimeters",
-  "emergency_halt": false,
-  "queue_length": 1,
-  "llm_result": {
-    "positions": [{"x": 0.05, "y": 0.0, "z": 0.0}],
-    "success": true
-  }
-}
-```
+### `usage_count` Writes on Every Cache Hit
 
-## Comparison: LLM vs Rule-Based
+Each cache hit increments `usage_count` and triggers a file save to `phrase_bank.json`. For automated test runs, initialize with `PhraseBank(auto_save=False)` to suppress this.
 
-| Aspect | Rule-Based | LLM-Based |
-|--------|------------|-----------|
-| **Speed** | Instant (~1ms) | Fast (~1-2s) |
-| **Cost** | Free | ~$0.075 per 1000 commands |
-| **Flexibility** | Limited patterns | Natural variations |
-| **Accuracy** | 100% for known patterns | ~95-98% |
-| **Offline** | Yes | No (requires API) |
-| **Extensibility** | Requires coding | Update examples |
+---
 
 ## Troubleshooting
 
 ### "Anthropic SDK not installed"
-
 ```bash
-pip install anthropic
+~/miniconda3/bin/pip install anthropic
 ```
+Or verify the Python environment: `which python` should point to an env with `anthropic` installed.
 
 ### "ANTHROPIC_API_KEY not set"
-
-Create a `.env` file with your API key:
-
-```bash
-cp .env.example .env
-# Edit .env and add your key
+Create `SpeechToText/.env`:
+```env
+ANTHROPIC_API_KEY=your_key_here
 ```
 
-### "LLM could not parse command"
+### Modifier commands returning wrong cached results
+Raise `FUZZY_MATCH_THRESHOLD` in `.env` and re-run the modifiers observation category. Also check that the modifier token isn't missing from the bypass list in `phrase_bank.py → fuzzy_sequence_match()`.
 
-- Check the log output for JSON parsing errors
-- Add similar commands to `phrase_bank.json` as examples
-- Verify the command uses supported direction keywords
+### Pass 3 firing unexpectedly often
+Check `VERBOSE_LOGGING=true` output to see what Pass 2 is catching. Common triggers: `place_at` / `transfer` instead of `add_layer` (now auto-corrected by post-validation safety net), or `move_absolute` in output (not a valid composite).
 
-### API Rate Limits
-
-If you hit rate limits:
-- Add delays between commands
-- Use a higher tier API key
-- Consider caching common commands
-
-## Future Enhancements
-
-Potential improvements:
-
-1. **Prompt Caching**: Reuse system prompts to reduce costs
-2. **Hybrid Approach**: Use rules for simple commands, LLM for complex ones
-3. **Fine-Tuning**: Train a smaller custom model for offline use
-4. **Command Prediction**: Suggest completions as user speaks
-5. **Context Memory**: Remember previous commands for relative movements
-
-## License
-
-Same as parent project.
+### Creative output causes executor errors
+Enable `VERBOSE_LOGGING=true` and compare `pass1_sequence` vs final `sequence` in the result. Since Pass 2 is skipped for creative commands, any invalid instruction would appear in `pass1_sequence` but also survive to `sequence`. Check the instruction name against `instruction_compiler.get_composites()`.

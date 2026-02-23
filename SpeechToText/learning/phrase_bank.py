@@ -121,6 +121,140 @@ class PhraseBank:
 
         return None
 
+    def sequence_match(self, phrase: str) -> Optional[Dict]:
+        """
+        Look for exact match in sequence phrase bank.
+        Returns a SequenceInterpreter-compatible result dict, or None.
+        """
+        phrase_lower = phrase.lower().strip().rstrip('.')
+        seq_phrases = self.data.get("sequence_phrases", {})
+
+        if phrase_lower in seq_phrases:
+            entry = seq_phrases[phrase_lower]
+            entry["usage_count"] = entry.get("usage_count", 0) + 1
+            if self.auto_save:
+                self.save()
+            # Return a full sequence-interpreter-compatible result
+            return {
+                "interpretation": entry["interpretation"],
+                "sequence": entry["sequence"],
+                "composite_name": entry.get("composite_name"),
+                "confidence": entry.get("confidence", 1.0),
+                "validated": True,
+                "validation_issues": [],
+                "user_feedback": None,
+                "is_creative": False,
+                "creative_reasoning": None,
+                "pass1_sequence": entry["sequence"],
+                "raw_response": None,
+                "_from_cache": True,
+            }
+
+        return None
+
+    def fuzzy_sequence_match(self, phrase: str) -> Optional[Tuple[str, Dict, float]]:
+        """
+        Find best fuzzy match in sequence phrase bank.
+        Returns (matched_phrase, result_dict, confidence) or None.
+
+        Guard 1 – modifier-word bypass:
+            If the phrase contains any modifier/qualifier word (e.g. "no",
+            "with", "hold", "double", "extra", "slow", "carefully", "swap",
+            "without", "over there", "nice and", etc.) the command carries
+            intent that differs from a plain cached recipe, so skip the cache
+            entirely and let the LLM handle it.
+
+        Guard 2 – pick-up item-noun guard:
+            For "pick up the X" / "gently grab the X" style phrases the
+            terminal item word must match exactly so that e.g. "pick up the
+            avocado" never fuzzy-hits "gently pick up the tomato".
+        """
+        import re as _re
+
+        phrase_lower = phrase.lower().strip().rstrip('.')
+        seq_phrases = self.data.get("sequence_phrases", {})
+
+        if not seq_phrases:
+            return None
+
+        # ── Guard 1: modifier-word bypass ──────────────────────────────────
+        # Any of these tokens in the command signal a variation/modifier that
+        # the cached base-recipe result won't satisfy — bypass the cache so
+        # the LLM sees the full intent.
+        _MODIFIER_TOKENS = _re.compile(
+            r'\b(?:'
+            r'no\b|without\b|hold\b|remove\b|skip\b'          # omissions
+            r'|extra\b|double\b|triple\b|more\b'               # additions/multipliers
+            r'|with\b(?!\s+a\b)'                               # "with X" (not "with a")
+            r'|swap\b|replace\b|instead\b|sub(?:stitute)?\b'  # substitutions
+            r'|slow(?:ly)?\b|fast(?:er|ly)?\b|quick(?:ly)?\b' # speed modifiers
+            r'|nice\s+and\b|carefully?\b|gently?\b'           # adverbial modifiers
+            r'|over\s+there\b|right\s+there\b|over\s+here\b'  # spatial deictics
+            r'|but\b|except\b|just\b(?=\s+(?:the\b|add\b|one\b))' # exclusion words
+            r')',
+            _re.IGNORECASE
+        )
+        if _MODIFIER_TOKENS.search(phrase_lower):
+            return None  # bypass cache — let LLM handle the modified intent
+
+        # ── Guard 2: pick-up item-noun guard ───────────────────────────────
+        # Match both bare and adverb-prefixed pick-up patterns so that e.g.
+        # "carefully pick up the avocado" doesn't hit "gently pick up the tomato".
+        _PICKUP_RE = _re.compile(
+            r'^(?:(?:carefully?|gently?|slowly?|quickly?)\s+)?'
+            r'(?:pick\s+up|grab|get|take)\s+(?:the\s+)?(\w+)$'
+        )
+        input_item_match = _PICKUP_RE.match(phrase_lower)
+        input_item = input_item_match.group(1) if input_item_match else None
+
+        best_ratio = 0.0
+        best_phrase = None
+
+        for known_phrase in seq_phrases:
+            # If this is a pick-up command, only consider candidates whose item
+            # word matches — skip any candidate with a different item word.
+            if input_item is not None:
+                candidate_item_match = _PICKUP_RE.match(known_phrase)
+                if candidate_item_match:
+                    if candidate_item_match.group(1) != input_item:
+                        continue  # item noun mismatch — don't fuzzy-match
+
+            ratio = SequenceMatcher(None, phrase_lower, known_phrase).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_phrase = known_phrase
+
+        if best_ratio >= FUZZY_MATCH_THRESHOLD and best_phrase:
+            # Build a full result via sequence_match on the matched phrase
+            result = self.sequence_match(best_phrase)
+            if result:
+                return (best_phrase, result, best_ratio)
+
+        return None
+
+    def add_sequence_phrase(self, phrase: str, interpretation: str,
+                           sequence: list, composite_name: str = None,
+                           confidence: float = 0.95):
+        """Add a new learned sequence phrase to the bank."""
+        phrase_lower = phrase.lower().strip()
+        seq_phrases = self.data.setdefault("sequence_phrases", {})
+
+        seq_phrases[phrase_lower] = {
+            "interpretation": interpretation,
+            "sequence": sequence,
+            "composite_name": composite_name,
+            "confidence": confidence,
+            "usage_count": 1,
+        }
+
+        from datetime import datetime
+        self.data["metadata"]["last_updated"] = datetime.now().isoformat()
+
+        if self.auto_save:
+            self.save()
+
+        print(f"  Learned sequence phrase: '{phrase}' -> {len(sequence)} steps")
+
     def add_phrase(self, phrase: str, intent: str, params: Dict, confidence: float = 0.95):
         """
         Add a new learned phrase to the bank.

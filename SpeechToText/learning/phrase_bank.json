@@ -305,6 +305,964 @@
       "usage_count": 2
     }
   },
+  "sequence_phrases": {
+    "make a blt": {
+      "interpretation": "Build BLT sandwich: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "make a cheese sandwich": {
+      "interpretation": "Build cheese sandwich: bread, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_sandwich",
+      "confidence": 1.0,
+      "usage_count": 15
+    },
+    "make a classic sandwich": {
+      "interpretation": "Build classic sandwich: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_classic_sandwich",
+      "confidence": 1.0,
+      "usage_count": 6
+    },
+    "make a veggie sandwich": {
+      "interpretation": "Build veggie sandwich: bread, lettuce, tomato, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_veggie_sandwich",
+      "confidence": 1.0,
+      "usage_count": 7
+    },
+    "make a club sandwich": {
+      "interpretation": "Build club sandwich: bread, meat, cheese, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_club_sandwich",
+      "confidence": 1.0,
+      "usage_count": 7
+    },
+    "make a sandwich": {
+      "interpretation": "Build classic sandwich: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_classic_sandwich",
+      "confidence": 1.0,
+      "usage_count": 11
+    },
+    "make me a blt": {
+      "interpretation": "Build BLT sandwich: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_blt",
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "make me a sandwich": {
+      "interpretation": "Build classic sandwich: bread, meat, lettuce, tomato, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "meat"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "lettuce"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "tomato"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_classic_sandwich",
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "make me a cheese sandwich": {
+      "interpretation": "Build cheese sandwich: bread, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_sandwich",
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "grilled cheese": {
+      "interpretation": "Build cheese sandwich: bread, cheese, bread",
+      "sequence": [
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "cheese"
+          }
+        },
+        {
+          "instruction": "add_layer",
+          "params": {
+            "item": "bread"
+          }
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": "make_cheese_sandwich",
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "pick up the cheese": {
+      "interpretation": "Pick up cheese from its slot",
+      "sequence": [
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "cheese"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "pick up the bread": {
+      "interpretation": "Pick up bread from its slot",
+      "sequence": [
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "bread"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 1
+    },
+    "pick up the lettuce": {
+      "interpretation": "Pick up lettuce from its slot",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "lettuce"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "pick up the tomato": {
+      "interpretation": "Pick up tomato from its slot",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "tomato"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "pick up the meat": {
+      "interpretation": "Pick up meat from its slot",
+      "sequence": [
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "meat"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "start over": {
+      "interpretation": "Clear the assembly and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 7
+    },
+    "put it back": {
+      "interpretation": "Return held item to its slot",
+      "sequence": [
+        {
+          "instruction": "return_to_stack",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "do it faster": {
+      "interpretation": "Increase robot speed",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "slow down": {
+      "interpretation": "Decrease robot speed",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "speed up": {
+      "interpretation": "Increase robot speed",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "fast"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally": {
+      "interpretation": "Diagonal move: forward + right (default axes)",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "forward",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "right",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 0.95,
+      "usage_count": 4
+    },
+    "move diagonally forward and right": {
+      "interpretation": "Diagonal move: forward + right",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "forward",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "right",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally forward and left": {
+      "interpretation": "Diagonal move: forward + left",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "forward",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "left",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally backward and right": {
+      "interpretation": "Diagonal move: backward + right",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "backward",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "right",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally backward and left": {
+      "interpretation": "Diagonal move: backward + left",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "backward",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "left",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally up and right": {
+      "interpretation": "Diagonal move: up + right",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "up",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "right",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally up and left": {
+      "interpretation": "Diagonal move: up + left",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "up",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "left",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally down and right": {
+      "interpretation": "Diagonal move: down + right",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "down",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "right",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "move diagonally down and left": {
+      "interpretation": "Diagonal move: down + left",
+      "sequence": [
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "down",
+            "distance": 10
+          }
+        },
+        {
+          "instruction": "move_relative",
+          "params": {
+            "direction": "left",
+            "distance": 10
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "never mind": {
+      "interpretation": "Cancel current operation and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "never mind start over": {
+      "interpretation": "Cancel current operation and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "cancel": {
+      "interpretation": "Cancel current operation and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "stop what you're doing": {
+      "interpretation": "Stop current action, clear assembly, and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "stop what you're doing and go home": {
+      "interpretation": "Stop current action, clear assembly, and return home",
+      "sequence": [
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "go home": {
+      "interpretation": "Return robot arm to home position",
+      "sequence": [
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "i made a mistake": {
+      "interpretation": "Return held item and clear assembly",
+      "sequence": [
+        {
+          "instruction": "return_to_stack",
+          "params": {}
+        },
+        {
+          "instruction": "clear_assembly",
+          "params": {}
+        },
+        {
+          "instruction": "go_home",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "undo that": {
+      "interpretation": "Return held item to its slot",
+      "sequence": [
+        {
+          "instruction": "return_to_stack",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "undo": {
+      "interpretation": "Return held item to its slot",
+      "sequence": [
+        {
+          "instruction": "return_to_stack",
+          "params": {}
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "carefully pick up the lettuce": {
+      "interpretation": "Set slow speed then pick up lettuce",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "lettuce"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 4
+    },
+    "carefully pick up the tomato": {
+      "interpretation": "Set slow speed then pick up tomato",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "tomato"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "gently pick up the lettuce": {
+      "interpretation": "Set slow speed then pick up lettuce",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "lettuce"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 0
+    },
+    "gently pick up the tomato": {
+      "interpretation": "Set slow speed then pick up tomato",
+      "sequence": [
+        {
+          "instruction": "adjust_speed",
+          "params": {
+            "modifier": "slow"
+          }
+        },
+        {
+          "instruction": "pick_up",
+          "params": {
+            "item": "tomato"
+          }
+        }
+      ],
+      "composite_name": null,
+      "confidence": 1.0,
+      "usage_count": 2
+    }
+  },
   "named_locations": {
     "home": {
       "x": 0.0,

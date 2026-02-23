@@ -49,6 +49,19 @@ class InstructionCompiler:
         self.instruction_set = self._load_instruction_set()
         self.scene_context = self._load_scene_context()
         self.execution_history: List[ExecutionPlan] = []
+        self._on_change_callbacks: List = []  # called when ISA changes (e.g. learn_composite)
+
+    def on_change(self, callback):
+        """Register a callback to be notified when the instruction set changes."""
+        self._on_change_callbacks.append(callback)
+
+    def _notify_change(self):
+        """Notify all registered listeners that the ISA has changed."""
+        for cb in self._on_change_callbacks:
+            try:
+                cb()
+            except Exception as e:
+                print(f"[WARN] ISA change callback failed: {e}")
 
     def _load_instruction_set(self) -> Dict:
         """Load the instruction set from JSON."""
@@ -289,6 +302,7 @@ class InstructionCompiler:
         # Save
         self.save_instruction_set()
         print(f"[LEARN] New composite: '{name}' ({len(sequence)} steps, conf={confidence:.2f})")
+        self._notify_change()
         return True
 
     # -------------------------------------------------------------------------
