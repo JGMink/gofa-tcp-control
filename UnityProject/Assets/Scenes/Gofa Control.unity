@@ -1809,6 +1809,7 @@ GameObject:
   - component: {fileID: 3797525683882037924}
   - component: {fileID: 3797525683882037928}
   - component: {fileID: 3797525683882037929}
+  - component: {fileID: 3797525683882037930}
   m_Layer: 0
   m_Name: TCP
   m_TagString: Untagged
@@ -1846,6 +1847,36 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tcpTransform: {fileID: 3797525683882037923}
   outputFilePath: tcp_current_position.json
+--- !u!114 &3797525683882037930
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3797525683882037927}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e015a2b7530805e4a8077c288c75be5a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  configPath: tcp_commands.json
+  pollInterval: 0.1
+  defaultMaxSpeed: 0.5
+  defaultAcceleration: 1
+  defaultDeceleration: 1
+  slowlyProfile:
+    speedMultiplier: 0.3
+    accelerationMultiplier: 0.5
+  carefullyProfile:
+    speedMultiplier: 0.4
+    accelerationMultiplier: 0.6
+  quicklyProfile:
+    speedMultiplier: 2
+    accelerationMultiplier: 3
+  messilyProfile:
+    speedMultiplier: 3
+    accelerationMultiplier: 5
+  showDebugGizmos: 1
 --- !u!33 &3847253973472018358
 MeshFilter:
   m_ObjectHideFlags: 0
