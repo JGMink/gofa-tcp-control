@@ -2,7 +2,7 @@
 
 **File:** `SpeechToText/learning/sequence_interpreter.py`
 **Model:** `claude-3-haiku-20240307`
-**Last updated:** February 2026
+**Last updated:** February 2026 (gripper integration, execution queue, cli_control rewrite)
 
 ---
 
@@ -17,15 +17,20 @@ It is a **three-pass LLM pipeline** — generation, validation, and conditional 
 ## Position in the Full Pipeline
 
 ```
-Voice
-  └─▶ Azure Speech-to-Text
+Voice (Azure ASR)  OR  CLI text (cli_control.py)
+  │
+  └─▶ Both share the same phrase_bank.json
         └─▶ Phrase bank (exact + fuzzy match — fast path for known phrases)
               │   ↳ modifier-word bypass: commands with modifiers skip
               │     the cache entirely and fall through to the LLM
               └─▶ Sequence Interpreter  ◀── this document
                     └─▶ Instruction Compiler  (composites → primitives)
-                          └─▶ Executor  (primitives → tcp_commands.json)
-                                └─▶ Unity / RobotStudio / ABB GoFa
+                          └─▶ InstructionExecutor
+                                │  _send_and_wait(): write → poll tcp_ack.json → next step
+                                └─▶ tcp_commands.json
+                                      └─▶ Unity (TCPHotController.cs)
+                                            └─▶ tcp_ack.json
+                                                  └─▶ ABB GoFa / RobotStudio
 
                     └─▶ Memory Writer  (secondary commands only)
                           └─▶ instruction_set.json  (learned_composites)
@@ -320,6 +325,50 @@ The regex covers adverb-prefixed variants:
 
 ---
 
+## Execution Queue — From Sequence to Unity
+
+After the sequence interpreter and compiler expand composites to primitives, `InstructionExecutor` drives each primitive to Unity one step at a time.
+
+### Move primitives — `_send_and_wait()`
+
+```
+1. Write {x, y, z, gripper_position} → tcp_commands.json
+2. Record write_time = time.time()
+3. Poll tcp_ack.json every 50ms
+4. Accept ack only if os.path.getmtime(tcp_ack.json) >= write_time  (stale-ack detection)
+5. Read back confirmed {x, y, z} from ack → update local position state
+6. Proceed to next primitive
+   (timeout: 10s → warn and use local position)
+```
+
+Unity writes `tcp_ack.json` via `TCPHotController.cs → WriteAcknowledgment()` after `"TCP reached target"`. The mtime comparison (rather than an ISO timestamp string) is used because Unity writes timestamps at second resolution, while `write_time` is a sub-second float — a same-second ack would otherwise appear stale.
+
+### Gripper primitives — fire-and-forget
+
+`gripper_open` and `gripper_close` update `self.gripper_position`, write position+gripper to `tcp_commands.json`, and return immediately without waiting for ack. Unity picks up the gripper change on the next file read. No `tcp_ack.json` is issued for gripper-only changes.
+
+### Startup sync
+
+On init, `InstructionExecutor` reads the current `tcp_commands.json` to initialize `self.gripper_position` and current position. This prevents the executor from drifting out of sync with Unity across restarts.
+
+### tcp_ack.json schema
+
+Written by `TCPHotController.cs` after each move:
+```json
+{
+  "completed": true,
+  "position": {
+    "x": 0.123,
+    "y": 0.567,
+    "z": -0.238,
+    "gripper_position": 0.11
+  },
+  "timestamp": "2026-02-22T14:35:01.123456+00:00"
+}
+```
+
+---
+
 ## Result Dict Schema
 
 Every call to `interpret()` returns either `None` (empty/trivial input) or a dict with these fields:
@@ -424,6 +473,18 @@ Creative commands skip Pass 2 validation entirely (`is_creative` short-circuits 
 
 **In practice:** Haiku rarely produces invalid creative sequences. But if a creative command consistently produces executor errors, enable verbose logging and check `pass1_sequence` vs the final `sequence`.
 
+### Gripper Changes Are Fire-and-Forget (No Ack)
+
+Gripper open/close primitives do not call `_send_and_wait()` — they write to `tcp_commands.json` and return immediately. Unity will pick up the gripper state on the next file read, but `tcp_ack.json` is only written after a move completes. Consequence: if a sequence does `gripper_close` immediately followed by `move_to`, the move ack confirms the move position but does not confirm the gripper width. In practice this works reliably (commands are processed in order), but there is no readback for gripper state.
+
+### Ack Timeout Is Conservative for Simulation
+
+`ACK_TIMEOUT = 10.0` seconds was set to accommodate real EGM/RobotStudio latency. In Unity-only simulation, moves typically complete in 0.5–2 seconds. If step throughput feels slow in simulation, this constant can safely be lowered to 2–3s. Keep it higher when real hardware is in the loop.
+
+### Stale Ack Detection Uses File Mtime (Not Timestamp String)
+
+The ack-wait uses `os.path.getmtime(tcp_ack.json) >= write_time` rather than parsing the ISO timestamp inside the file. This is intentional: Unity writes timestamps at second resolution, while Python's `write_time` is a sub-second float. A same-second ack would compare as stale if timestamp strings were used directly. Mtime is OS-level and reliable. Note: on some network filesystems (NFS, CIFS), mtime granularity can be coarser — if deploying on such a filesystem, consider an alternative mechanism.
+
 ### Phrase Bank Growth and `usage_count` Drift
 
 Every cache hit increments `usage_count` in `phrase_bank.json` and triggers an immediate file save. In high-throughput scenarios (e.g. running the 55-case observation suite repeatedly), this results in many small disk writes per run. The phrase bank file is also getting progressively larger as `usage_count` values grow.
@@ -446,3 +507,5 @@ Documented in `instruction_set.json → _meta.backburner`:
 - **Feedback channel** — user-facing TTS or text notification for impossible commands. Scaffolded via `user_feedback` field. Full integration with speech output or UI notification pending.
 - **Memory pipeline integration** — secondary commands currently write to `learned_composites` and `phrase_bank.json` via the memory writer, but the phrase bank dispatcher does not yet read `learned_aliases`. Loop needs closing.
 - **Quantity awareness** — commands like "make two sandwiches" or "add three layers of cheese" have no quantity-dispatch mechanism. Currently falls through to a single-instance cache hit or LLM interpretation without repetition logic.
+- **Gripper ack confirmation** — gripper open/close changes are currently fire-and-forget (no `tcp_ack.json` readback). A future improvement would have Unity write a gripper-specific ack (or include gripper confirmation in the move ack) to allow the executor to verify the gripper reached its target width before proceeding.
+- **RobotStudio / EGM integration** — the current `tcp_commands.json` file-based IPC works for Unity simulation. Full integration with an ABB EGM socket connection or RAPID program for live hardware is pending.
