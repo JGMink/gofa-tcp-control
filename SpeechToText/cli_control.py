@@ -73,7 +73,6 @@ def save_position():
             "x": round(current_position["x"], 4),
             "y": round(current_position["y"], 4),
             "z": round(current_position["z"], 4),
-            "gripper_position": 0.11,  # always open — gripper not controlled here
         }
     with open(COMMAND_QUEUE_FILE, 'w') as f:
         json.dump(output, f, indent=2)

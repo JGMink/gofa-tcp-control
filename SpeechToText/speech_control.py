@@ -445,7 +445,6 @@ def save_command_queue():
                     "x": latest_move["x"],
                     "y": latest_move["y"],
                     "z": latest_move["z"],
-                    "gripper_position": 0.11,  # always open — gripper not controlled here
                 }
                 json.dump(output, f, indent=2)
                 print(f"{get_timestamp()}    Written to JSON: {output}")
@@ -454,7 +453,6 @@ def save_command_queue():
                     "x": current_position["x"],
                     "y": current_position["y"],
                     "z": current_position["z"],
-                    "gripper_position": 0.11,  # always open — gripper not controlled here
                 }
                 json.dump(output, f, indent=2)
                 print(f"{get_timestamp()}    Written to JSON: {output}")

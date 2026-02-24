@@ -41,6 +41,6 @@ python speech_control.py     # voice commands — needs Azure keys + mic
 
 ## How It Works
 
-See **`SpeechToText/README.md`** for the full pipeline explanation and the junior developer guide (waypoint queues, shape drawing, arc motion).
+See **`SpeechToText/README.md`** for the full pipeline explanation and the VIP Student guide (waypoint queues, shape drawing, arc motion).
 
 See **`SETUP.md`** for hardware setup, network config, and startup order.
