@@ -1,336 +1,253 @@
-#!/usr/bin/env python3
 """
-CLI Robot Control - Type commands to control the robot.
-Supports simple commands ("move 10cm left", "close gripper") via the phrase
-bank + LLM interpreter, and complex commands ("pick up the cheese",
-"make a BLT") via the same sequence interpreter used by speech_control_llm.py.
+CLI Robot Control
+=================
+Type movement commands to control the robot via TCP.
+Uses the same command parser as speech_control.py — no LLM, no gripper.
 
-Both paths share the same phrase_bank.json so learned phrases and cached
-sequences are available from both the CLI and the speech interface.
+Usage:
+  python cli_control.py
+
+Commands:
+  move right              -> moves 1.0 unit right
+  move right 5            -> moves 5 units right
+  move right a tiny bit   -> moves 0.3 units right
+  move right and up       -> diagonal movement
+  move right then up      -> sequential movements
+  stop / halt / quit      -> exit
 """
 
-import sys
 import json
 import os
+import re
+import threading
+from datetime import datetime
 
-from learning.llm_interpreter import LLMInterpreter
-from learning.intent_executor import get_executor
-from learning.phrase_bank import get_phrase_bank
-from learning.instruction_compiler import get_compiler, InstructionExecutor
-from learning.sequence_interpreter import SequenceInterpreter
+import pathlib
 
+# ── shared config ──────────────────────────────────────────────────────────────
+COMMAND_QUEUE_FILE = "../UnityProject/tcp_commands.json"
+DISTANCE_SCALE = 0.1
 
-# ---------------------------------------------------------------------------
-# Sequence-command keywords — same heuristic as speech_control_llm.py
-# ---------------------------------------------------------------------------
-_SEQ_KEYWORDS = {
-    "pick", "place", "put", "make", "build", "assemble", "stack",
-    "transfer", "grab", "get", "take", "add", "layer", "clear",
-}
+pathlib.Path(COMMAND_QUEUE_FILE).parent.mkdir(parents=True, exist_ok=True)
 
-# Multi-word phrases that should also go through the sequence path
-_SEQ_PHRASES = {"start over", "never mind", "go home", "put it back"}
-
-def _looks_like_sequence_command(text: str) -> bool:
-    """Return True if the command is likely complex enough for the sequence interpreter."""
-    low = text.lower()
-    if any(p in low for p in _SEQ_PHRASES):
-        return True
-    words = set(low.split())
-    return bool(words & _SEQ_KEYWORDS)
+# ── global state ───────────────────────────────────────────────────────────────
+command_queue = []
+queue_lock = threading.Lock()
+current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
+position_lock = threading.Lock()
 
 
-# ---------------------------------------------------------------------------
-# Help / status / object listing
-# ---------------------------------------------------------------------------
-
-def print_help():
-    print("""
-=== CLI Robot Control ===
-
-Type natural language commands to control the robot.
-Complex commands (pick up, make a sandwich, etc.) go through the full
-sequence interpreter — same pipeline as speech control.
-
-MOVEMENT:
-  move 10 left          go right 5cm
-  move up a little      go back
-
-GRIPPER:
-  open gripper          release / let go / drop it
-  close gripper         grab / grip
-  close to 50mm
-
-SANDWICH / ASSEMBLY:
-  pick up the cheese
-  make a BLT
-  make a club sandwich with extra meat
-  start over
-
-COMPOUND:
-  move up and close gripper
-  grab it and move left
-
-NAVIGATION:
-  go home
-  return to previous
-  save this as pickup_zone
-
-META:
-  help   - this message
-  status - current robot state
-  quit   - exit
-============================
-""")
-
-
-def print_status(executor, seq_executor=None):
-    state = executor.get_state()
-    pos = state['current_position']
-    print("\n--- Current Status ---")
-    print(f"Position:       ({pos['x']:.3f}, {pos['y']:.3f}, {pos['z']:.3f})")
-    print(f"Gripper:        {state['gripper_state'].upper()}")
-    print(f"Emergency Halt: {state['emergency_halt']}")
-    if executor.held_object:
-        print(f"Holding:        {executor.held_object}")
-    if state['previous_position']:
-        prev = state['previous_position']
-        print(f"Previous pos:   ({prev['x']:.3f}, {prev['y']:.3f}, {prev['z']:.3f})")
-    if seq_executor:
-        print(f"Seq gripper:    {seq_executor.gripper_position*1000:.1f}mm")
-    print("--------------------\n")
-
-
-def list_objects(executor):
-    objects = executor.get_objects()
-    if not objects:
-        print("\nNo objects registered yet.\n")
-        return
-    print("\n--- Known Objects ---")
-    for name, obj in objects.items():
-        pos = obj['position']
-        props = obj.get('properties', {})
-        held = "(HELD)" if props.get('held') else ""
-        color = props.get('color', 'unknown')
-        print(f"  • {name}: ({pos['x']:.3f}, {pos['y']:.3f}, {pos['z']:.3f}) [{color}] {held}")
-    print("--------------------\n")
-
-
-# ---------------------------------------------------------------------------
-# Sequence path (pick up / make a sandwich / etc.)
-# ---------------------------------------------------------------------------
-
-def _run_sequence_command(text: str, phrase_bank, seq_interpreter: SequenceInterpreter,
-                          seq_executor: InstructionExecutor) -> bool:
-    """
-    Try the phrase bank sequence cache first, then the LLM sequence interpreter.
-    Returns True if handled, False if it should fall through to the simple path.
-    """
-    # 1. Exact sequence cache hit
-    cached = phrase_bank.sequence_match(text)
-    if cached:
-        print(f"  [cache hit] {cached.get('interpretation', '')}")
-        _execute_plan(cached['sequence'], seq_executor)
-        return True
-
-    # 2. Fuzzy sequence cache hit
-    fuzzy = phrase_bank.fuzzy_sequence_match(text)
-    if fuzzy:
-        matched_phrase, cached, ratio = fuzzy
-        print(f"  [fuzzy cache {ratio:.2f}] matched '{matched_phrase}'")
-        print(f"  {cached.get('interpretation', '')}")
-        _execute_plan(cached['sequence'], seq_executor)
-        return True
-
-    # 3. Full LLM sequence interpretation
-    result = seq_interpreter.interpret(text)
-    if result is None:
-        return False  # empty / trivial — fall through
-
-    interp = result.get('interpretation', '')
-    seq = result.get('sequence', [])
-    conf = result.get('confidence', 0.0)
-    issues = result.get('validation_issues', [])
-    feedback = result.get('user_feedback')
-
-    print(f"  Interpretation: {interp}")
-    print(f"  Confidence:     {conf:.2f}  ({'HIGH' if conf>=0.9 else 'MED' if conf>=0.75 else 'LOW'})")
-    if issues:
-        print(f"  Validation:     {'; '.join(issues)}")
-    if feedback:
-        print(f"  Feedback:       {feedback}")
-
-    if not seq:
-        print("  (empty sequence — nothing to execute)\n")
-        return True
-
-    if conf < 0.6:
-        confirm = input("  Low confidence — execute anyway? (y/n): ").strip().lower()
-        if confirm != 'y':
-            print("  Skipped.\n")
-            return True
-
-    _execute_plan(seq, seq_executor)
-
-    # Learn if confident enough and composite name suggested
-    composite = result.get('composite_name')
-    if composite and conf >= 0.80 and not result.get('_from_cache') and not result.get('is_creative'):
-        phrase_bank.add_sequence_phrase(
-            phrase=text,
-            interpretation=interp,
-            sequence=seq,
-            composite_name=composite,
-            confidence=conf,
-        )
-        print(f"  [learned] saved as '{composite}'\n")
-
-    return True
-
-
-def _execute_plan(sequence: list, seq_executor: InstructionExecutor):
-    """Drive InstructionExecutor through a compiled sequence list."""
-    from learning.instruction_compiler import ExecutionStep
-    print(f"  Executing {len(sequence)} step(s):")
-    for step_dict in sequence:
-        instr = step_dict.get('instruction', '')
-        params = step_dict.get('params', {})
-        step = ExecutionStep(instruction=instr, params=params)
-        ok = seq_executor.execute_step(step)
-        status = "✓" if ok else "✗"
-        param_str = f"  {params}" if params else ""
-        print(f"    {status} {instr}(){param_str}")
-    print()
-
-
-# ---------------------------------------------------------------------------
-# Simple intent path (move, gripper, named location, etc.)
-# ---------------------------------------------------------------------------
-
-def _handle_simple_result(executed: dict):
-    if not executed:
-        print("✗ Execution failed\n")
-        return
-    cmd_type = executed.get('command_type', '')
-    if cmd_type == 'not_implemented':
-        print(f"⚠️  {executed.get('message', 'Not implemented')}\n")
-    elif cmd_type == 'error':
-        print(f"✗ Error: {executed.get('message', 'Unknown error')}\n")
-    elif cmd_type == 'compound':
-        print(f"✓ Compound command ({executed.get('steps_completed', 0)} steps)\n")
-    elif cmd_type == 'move':
-        pos = executed.get('position', {})
-        print(f"✓ Moved to ({pos.get('x',0):.3f}, {pos.get('y',0):.3f}, {pos.get('z',0):.3f})\n")
-    elif cmd_type == 'gripper':
-        action = executed.get('action', 'unknown')
-        pos_mm = executed.get('position_mm', executed.get('position', 0) * 1000)
-        print(f"✓ Gripper {action.upper()} → {pos_mm:.0f}mm\n")
-    elif cmd_type == 'pick':
-        print(f"✓ Picked up '{executed.get('object_name', 'object')}'\n")
-    elif cmd_type == 'place':
-        print(f"✓ Placed '{executed.get('object_name', 'object')}'\n")
-    elif cmd_type == 'emergency_halt':
-        print("🛑 EMERGENCY HALT\n")
-    elif cmd_type == 'resume':
-        print("▶️  Resumed\n")
-    else:
-        print(f"✓ {cmd_type}\n")
-
-
-# ---------------------------------------------------------------------------
-# Main loop
-# ---------------------------------------------------------------------------
-
-def main():
-    print("=== CLI Robot Control ===")
-    print("Initializing...")
-
+# ── position persistence ───────────────────────────────────────────────────────
+def load_current_position():
+    global current_position
     try:
-        phrase_bank    = get_phrase_bank()
-        interpreter    = LLMInterpreter()
-        interpreter.set_phrase_bank(phrase_bank)
-        simple_executor = get_executor()
+        if os.path.exists(COMMAND_QUEUE_FILE):
+            with open(COMMAND_QUEUE_FILE, 'r') as f:
+                pos = json.loads(f.read().strip())
+                if 'x' in pos and 'y' in pos and 'z' in pos:
+                    with position_lock:
+                        current_position = {"x": pos["x"], "y": pos["y"], "z": pos["z"]}
+                    print(f"[OK] Loaded position: {current_position}")
+                    return
+    except Exception:
+        pass
+    try:
+        ack_file = COMMAND_QUEUE_FILE.replace('tcp_commands.json', 'tcp_ack.json')
+        if os.path.exists(ack_file):
+            with open(ack_file, 'r') as f:
+                ack = json.loads(f.read().strip())
+                pos = ack.get('position', {})
+                if 'x' in pos and 'y' in pos and 'z' in pos:
+                    with position_lock:
+                        current_position = {"x": pos["x"], "y": pos["y"], "z": pos["z"]}
+                    print(f"[OK] Loaded position from ack: {current_position}")
+                    return
+    except Exception:
+        pass
+    print(f"[INFO] Using default position: {current_position}")
 
-        compiler       = get_compiler()
-        seq_executor   = InstructionExecutor(compiler)
-        seq_interpreter = SequenceInterpreter(compiler)
 
-        print("✓ Ready!  (type 'help' for commands)\n")
+def save_position():
+    with position_lock:
+        output = {
+            "x": current_position["x"],
+            "y": current_position["y"],
+            "z": current_position["z"],
+        }
+    with open(COMMAND_QUEUE_FILE, 'w') as f:
+        json.dump(output, f, indent=2)
+    print(f"         Written to JSON: {output}")
 
-    except Exception as e:
-        print(f"✗ Failed to initialize: {e}")
-        print("\nMake sure ANTHROPIC_API_KEY is set in .env or environment.")
+
+# ── command parsing (mirrors speech_control.py) ────────────────────────────────
+def split_into_commands(text: str):
+    text = text.lower()
+    for sep in [r'\s+and\s+then\s+', r'\s+then\s+', r',\s*then\s+',
+                r'\s+after\s+that\s+', r'\s+next\s+']:
+        text = re.sub(sep, '|THEN|', text)
+    text = re.sub(r'\s+and\s+', '|AND|', text)
+    text = re.sub(r',\s*', '|THEN|', text)
+
+    parts = [p.strip() for p in text.split('|') if p.strip()]
+    commands = []
+    for i, part in enumerate(parts):
+        if part in ('THEN', 'AND'):
+            continue
+        combine = i > 0 and parts[i - 1] == 'AND'
+        commands.append((part, combine))
+    return commands
+
+
+def parse_movement_command(text: str):
+    text_lower = text.lower()
+    number_match = re.search(r'(\d+(?:\.\d+)?)', text_lower)
+    distance = float(number_match.group(1)) if number_match else 1.0
+
+    if not number_match:
+        if any(w in text_lower for w in ("tiny", "teensy", "small")):
+            distance = 0.3
+        elif any(w in text_lower for w in ("little bit", "slightly", "bit")):
+            distance = 0.5
+        elif any(w in text_lower for w in ("large", "big", "lot")):
+            distance = 2.0
+
+    if "millimeter" in text_lower or "mm" in text_lower:
+        distance /= 10.0
+
+    delta = {"x": 0.0, "y": 0.0, "z": 0.0}
+    scaled = distance * DISTANCE_SCALE
+    found = False
+
+    if "right"    in text_lower:                           delta["x"] =  scaled; found = True
+    if "left"     in text_lower:                           delta["x"] = -scaled; found = True
+    if "up"       in text_lower or "upward"   in text_lower: delta["y"] =  scaled; found = True
+    if "down"     in text_lower or "downward" in text_lower: delta["y"] = -scaled; found = True
+    if "forward"  in text_lower or "ahead"    in text_lower: delta["z"] =  scaled; found = True
+    if "backward" in text_lower or "back"     in text_lower: delta["z"] = -scaled; found = True
+
+    return delta if found else None
+
+
+def apply_delta(position, delta):
+    return {
+        "x": position["x"] + delta["x"],
+        "y": position["y"] + delta["y"],
+        "z": position["z"] + delta["z"],
+    }
+
+
+def process_command(text: str):
+    commands = split_into_commands(text)
+    positions = []
+
+    with position_lock:
+        temp_pos = current_position.copy()
+        acc_delta = {"x": 0.0, "y": 0.0, "z": 0.0}
+        acc_text = []
+
+        for i, (cmd, combine) in enumerate(commands):
+            delta = parse_movement_command(cmd)
+            if not delta:
+                print(f"  [?] Unrecognised: '{cmd}'")
+                continue
+
+            is_last = (i == len(commands) - 1)
+            next_separate = not is_last and not commands[i + 1][1]
+
+            if combine:
+                acc_delta["x"] += delta["x"]
+                acc_delta["y"] += delta["y"]
+                acc_delta["z"] += delta["z"]
+                acc_text.append(cmd)
+                print(f"  Combining: '{cmd}' -> {delta}")
+
+                if is_last or next_separate:
+                    temp_pos = apply_delta(temp_pos, acc_delta)
+                    positions.append({
+                        "position": temp_pos.copy(),
+                        "command_text": " and ".join(acc_text),
+                        "delta": acc_delta.copy(),
+                    })
+                    print(f"  [+] Combined: {acc_delta} => {temp_pos}")
+                    acc_delta = {"x": 0.0, "y": 0.0, "z": 0.0}
+                    acc_text = []
+            else:
+                if acc_text:
+                    temp_pos = apply_delta(temp_pos, acc_delta)
+                    positions.append({
+                        "position": temp_pos.copy(),
+                        "command_text": " and ".join(acc_text),
+                        "delta": acc_delta.copy(),
+                    })
+                    acc_delta = {"x": 0.0, "y": 0.0, "z": 0.0}
+                    acc_text = []
+
+                acc_delta = delta.copy()
+                acc_text = [cmd]
+
+                if is_last:
+                    temp_pos = apply_delta(temp_pos, acc_delta)
+                    positions.append({
+                        "position": temp_pos.copy(),
+                        "command_text": cmd,
+                        "delta": delta,
+                    })
+                    print(f"  Sequential: '{cmd}' -> {delta} => {temp_pos}")
+
+    return positions
+
+
+def execute_positions(positions):
+    global current_position, command_queue
+    if not positions:
         return
+    with queue_lock:
+        with position_lock:
+            for p in positions:
+                command_queue.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "command_type": "move",
+                    "position": p["position"],
+                    "delta": p["delta"],
+                    "text": p["command_text"],
+                })
+            current_position = positions[-1]["position"].copy()
+    save_position()
+    print(f"  -> {len(positions)} command(s) sent. Position: {current_position}\n")
+
+
+# ── main loop ──────────────────────────────────────────────────────────────────
+def main():
+    print("=" * 55)
+    print("CLI Robot Control  (no LLM, no gripper)")
+    print("=" * 55)
+    print("Type movement commands, e.g.:")
+    print("  move right 5")
+    print("  move up and forward")
+    print("  move left then down 3")
+    print("  stop / quit  ->  exit\n")
+
+    load_current_position()
+    print(f"Start position: {current_position}\n")
+
+    STOP_WORDS = {"stop", "halt", "quit", "exit", "q"}
 
     while True:
         try:
-            command = input("robot> ").strip()
-            if not command:
-                continue
+            text = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting.")
+            break
 
-            low = command.lower()
+        if not text:
+            continue
 
-            # ── meta commands ──────────────────────────────────────────
-            if low in ('quit', 'exit', 'q'):
-                print("Goodbye!")
-                break
-            elif low == 'help':
-                print_help()
-                continue
-            elif low == 'status':
-                print_status(simple_executor, seq_executor)
-                continue
-            elif low == 'objects':
-                list_objects(simple_executor)
-                continue
-            elif low == 'clear':
-                os.system('clear' if os.name == 'posix' else 'cls')
-                continue
+        if text.lower() in STOP_WORDS:
+            print("Exiting.")
+            break
 
-            print(f"→ '{command}'")
-
-            # ── sequence path for complex commands ────────────────────
-            if _looks_like_sequence_command(command):
-                handled = _run_sequence_command(
-                    command, phrase_bank, seq_interpreter, seq_executor
-                )
-                if handled:
-                    continue
-                # fall through to simple path if sequence returned nothing
-
-            # ── simple path: phrase bank → LLM interpreter ────────────
-            # Check phrase bank exact/fuzzy first (same bank, fast)
-            matched = phrase_bank.exact_match(command) or (
-                phrase_bank.fuzzy_match(command)[1]
-                if phrase_bank.fuzzy_match(command) else None
-            )
-
-            result = interpreter.interpret_command(command)
-            if not result:
-                print("✗ Could not interpret command. Try 'help'.\n")
-                continue
-
-            intent     = result['intent']
-            params     = result['params']
-            confidence = result['confidence']
-
-            print(f"  Intent:     {intent}")
-            if params:
-                print(f"  Params:     {params}")
-            print(f"  Confidence: {confidence:.2f}")
-
-            if confidence < 0.7:
-                confirm = input("  Low confidence — execute anyway? (y/n): ").strip().lower()
-                if confirm != 'y':
-                    print("  Skipped.\n")
-                    continue
-
-            executed = simple_executor.execute(intent, params)
-            _handle_simple_result(executed)
-
-        except KeyboardInterrupt:
-            print("\n\nUse 'quit' to exit.\n")
-        except Exception as e:
-            print(f"✗ Error: {e}\n")
+        positions = process_command(text)
+        execute_positions(positions)
 
 
 if __name__ == "__main__":

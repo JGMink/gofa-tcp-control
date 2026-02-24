@@ -22,6 +22,8 @@ Commands:
   "move right and up"    -> diagonal movement (combines into single move)
   "move right then up"   -> sequential movements (two separate moves)
   "stop" / "halt"        -> emergency shutdown
+
+Note: gripper commands are not supported in this version.
 """
 
 import argparse
@@ -88,8 +90,6 @@ PHRASE_LIST = [
     "halt", "wait", "pause", "emergency", "go right", "go left",
     "go up", "go down", "go forward", "go backward",
     "tiny", "teensy", "little bit", "slightly", "large", "big",
-    "open gripper", "close gripper", "open hand", "close hand",
-    "grab", "release", "grip", "let go", "open", "close"
 ]
 
 # EMERGENCY halt words
@@ -107,7 +107,6 @@ command_queue = []
 queue_lock = threading.Lock()
 emergency_halt = threading.Event()
 current_position = {"x": 0.0, "y": 0.567, "z": -0.24}
-gripper_position = 0.11  # 0.0 = closed, 0.11 = fully open (RG2)
 position_lock = threading.Lock()
 
 # Precise mode state (for --precise flag)
@@ -118,8 +117,8 @@ pending_command_lock = threading.Lock()
 
 
 def load_current_position():
-    """Load the current position and gripper state from tcp_commands.json or tcp_ack.json."""
-    global current_position, gripper_position
+    """Load the current position from tcp_commands.json or tcp_ack.json."""
+    global current_position
 
     # Try tcp_commands.json first
     try:
@@ -130,11 +129,8 @@ def load_current_position():
                     pos = json.loads(content)
                     if 'x' in pos and 'y' in pos and 'z' in pos:
                         with position_lock:
-                            # Extract gripper_position before storing, keep position clean
-                            if 'gripper_position' in pos:
-                                gripper_position = pos['gripper_position']
                             current_position = {"x": pos["x"], "y": pos["y"], "z": pos["z"]}
-                        print(f"[OK] Loaded position from tcp_commands.json: {current_position}, gripper: {gripper_position*1000:.1f}mm")
+                        print(f"[OK] Loaded position from tcp_commands.json: {current_position}")
                         return True
     except Exception as e:
         print(f"[WARN] Could not load from tcp_commands.json: {e}")
@@ -151,10 +147,8 @@ def load_current_position():
                         pos = ack['position']
                         if 'x' in pos and 'y' in pos and 'z' in pos:
                             with position_lock:
-                                if 'gripper_position' in pos:
-                                    gripper_position = pos['gripper_position']
                                 current_position = {"x": pos["x"], "y": pos["y"], "z": pos["z"]}
-                            print(f"[OK] Loaded position from tcp_ack.json: {current_position}, gripper: {gripper_position*1000:.1f}mm")
+                            print(f"[OK] Loaded position from tcp_ack.json: {current_position}")
                             return True
     except Exception as e:
         print(f"[WARN] Could not load from tcp_ack.json: {e}")
@@ -292,36 +286,6 @@ def parse_movement_command(text: str):
     return delta
 
 
-def parse_gripper_command(text: str):
-    """
-    Parse gripper commands from text.
-    Returns the new gripper position (float) or None if not a gripper command.
-    """
-    text_lower = text.lower().strip()
-
-    # Open gripper patterns
-    open_patterns = ["open gripper", "open hand", "open the gripper", "open the hand",
-                     "release", "let go", "drop it", "drop", "ungrab", "ungrip"]
-    for pattern in open_patterns:
-        if pattern in text_lower:
-            return 0.11  # Fully open
-
-    # Close gripper patterns
-    close_patterns = ["close gripper", "close hand", "close the gripper", "close the hand",
-                      "grab", "grip", "grasp", "hold", "pick up", "pick it up"]
-    for pattern in close_patterns:
-        if pattern in text_lower:
-            return 0.0  # Fully closed
-
-    # Half-close patterns
-    half_patterns = ["half close", "half open", "halfway", "half grip"]
-    for pattern in half_patterns:
-        if pattern in text_lower:
-            return 0.055  # Half open
-
-    return None
-
-
 def apply_delta_to_position(position: dict, delta: dict) -> dict:
     """Apply a delta to a position and return the new position."""
     return {
@@ -333,25 +297,11 @@ def apply_delta_to_position(position: dict, delta: dict) -> dict:
 
 def process_multi_command_sentence(text: str, skip_measurement_check: bool = False):
     """
-    Process a sentence that may contain multiple movement and gripper commands.
+    Process a sentence that may contain multiple movement commands.
     Handles 'and' (combine) and 'then' (sequential).
     In --precise mode, prompts for measurement if not given.
     """
-    global pending_command_direction, gripper_position
-
-    # Check for gripper command first (can be standalone or part of compound)
-    gripper_target = parse_gripper_command(text)
-    if gripper_target is not None:
-        with position_lock:
-            gripper_position = gripper_target
-            state = "OPEN" if gripper_target > 0.09 else "CLOSED" if gripper_target < 0.01 else f"{gripper_target*1000:.0f}mm"
-            print(f"{get_timestamp()} Gripper -> {state}")
-            # Return current position (unchanged) so it gets written to file with new gripper state
-            return [{
-                "position": current_position.copy(),
-                "command_text": f"gripper {state.lower()}",
-                "delta": {"x": 0.0, "y": 0.0, "z": 0.0}
-            }]
+    global pending_command_direction
 
     # Handle measurement response in precise mode
     if not skip_measurement_check and PRECISE_MODE:
@@ -380,31 +330,6 @@ def process_multi_command_sentence(text: str, skip_measurement_check: bool = Fal
         accumulated_text = []
 
         for i, (cmd, combine) in enumerate(commands):
-            # Check for gripper sub-command within compound commands
-            gripper_sub = parse_gripper_command(cmd)
-            if gripper_sub is not None:
-                gripper_position = gripper_sub
-                state = "OPEN" if gripper_sub > 0.09 else "CLOSED" if gripper_sub < 0.01 else f"{gripper_sub*1000:.0f}mm"
-                print(f"  Gripper sub-command: {state}")
-                # Flush any accumulated movement first
-                if accumulated_text:
-                    temp_position = apply_delta_to_position(temp_position, accumulated_delta)
-                    combined_text = " and ".join(accumulated_text)
-                    positions.append({
-                        "position": temp_position.copy(),
-                        "command_text": combined_text,
-                        "delta": accumulated_delta.copy()
-                    })
-                    accumulated_delta = {"x": 0.0, "y": 0.0, "z": 0.0}
-                    accumulated_text = []
-                # Add a position entry so the gripper state gets written
-                positions.append({
-                    "position": temp_position.copy(),
-                    "command_text": f"gripper {state.lower()}",
-                    "delta": {"x": 0.0, "y": 0.0, "z": 0.0}
-                })
-                continue
-
             # Check for missing measurement in precise mode
             if not skip_measurement_check and PRECISE_MODE and not has_measurement(cmd):
                 direction = get_direction_from_text(cmd)
@@ -504,9 +429,7 @@ def add_positions_to_queue(positions: list):
 
 
 def save_command_queue():
-    """Save only the latest command to JSON file (overwrites previous).
-    Always includes gripper_position alongside x, y, z.
-    """
+    """Save only the latest command to JSON file (overwrites previous)."""
     with open(COMMAND_QUEUE_FILE, 'w') as f:
         if command_queue:
             latest_move = None
@@ -520,20 +443,17 @@ def save_command_queue():
                     "x": latest_move["x"],
                     "y": latest_move["y"],
                     "z": latest_move["z"],
-                    "gripper_position": gripper_position
                 }
                 json.dump(output, f, indent=2)
                 print(f"{get_timestamp()}    Written to JSON: {output}")
             else:
-                # No move command, but gripper may have changed - write current state
                 output = {
                     "x": current_position["x"],
                     "y": current_position["y"],
                     "z": current_position["z"],
-                    "gripper_position": gripper_position
                 }
                 json.dump(output, f, indent=2)
-                print(f"{get_timestamp()}    Written to JSON (gripper only): {output}")
+                print(f"{get_timestamp()}    Written to JSON: {output}")
         else:
             json.dump({}, f)
 
@@ -914,9 +834,7 @@ def main():
         print("  - No qualifier = 1.0 unit")
 
     load_current_position()
-    print(f"Start position: {current_position}")
-    print(f"Gripper: {gripper_position*1000:.1f}mm ({'OPEN' if gripper_position > 0.09 else 'CLOSED' if gripper_position < 0.01 else 'PARTIAL'})")
-    print(f"Gripper commands: 'open gripper', 'close gripper', 'grab', 'release'\n")
+    print(f"Start position: {current_position}\n")
 
     stop_event = threading.Event()
     stream_writer = None
