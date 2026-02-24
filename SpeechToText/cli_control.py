@@ -46,7 +46,7 @@ def load_current_position():
                 pos = json.loads(f.read().strip())
                 if 'x' in pos and 'y' in pos and 'z' in pos:
                     with position_lock:
-                        current_position = {"x": pos["x"], "y": pos["y"], "z": pos["z"]}
+                        current_position = {"x": round(pos["x"], 4), "y": round(pos["y"], 4), "z": round(pos["z"], 4)}
                     print(f"[OK] Loaded position: {current_position}")
                     return
     except Exception:
@@ -59,7 +59,7 @@ def load_current_position():
                 pos = ack.get('position', {})
                 if 'x' in pos and 'y' in pos and 'z' in pos:
                     with position_lock:
-                        current_position = {"x": pos["x"], "y": pos["y"], "z": pos["z"]}
+                        current_position = {"x": round(pos["x"], 4), "y": round(pos["y"], 4), "z": round(pos["z"], 4)}
                     print(f"[OK] Loaded position from ack: {current_position}")
                     return
     except Exception:
@@ -70,9 +70,9 @@ def load_current_position():
 def save_position():
     with position_lock:
         output = {
-            "x": current_position["x"],
-            "y": current_position["y"],
-            "z": current_position["z"],
+            "x": round(current_position["x"], 4),
+            "y": round(current_position["y"], 4),
+            "z": round(current_position["z"], 4),
         }
     with open(COMMAND_QUEUE_FILE, 'w') as f:
         json.dump(output, f, indent=2)
@@ -111,11 +111,16 @@ def parse_movement_command(text: str):
         elif any(w in text_lower for w in ("large", "big", "lot")):
             distance = 2.0
 
-    if "millimeter" in text_lower or "mm" in text_lower:
+    # DISTANCE_SCALE=0.1 means raw units → metres (1 unit = 0.1m = 10cm)
+    # cm: divide by 10 so 20cm → 2 units → 0.2m
+    # mm: divide by 100 so 20mm → 0.2 units → 0.02m
+    if "centimeter" in text_lower or "cm" in text_lower:
         distance /= 10.0
+    elif "millimeter" in text_lower or "mm" in text_lower:
+        distance /= 100.0
 
     delta = {"x": 0.0, "y": 0.0, "z": 0.0}
-    scaled = distance * DISTANCE_SCALE
+    scaled = round(distance * DISTANCE_SCALE, 4)
     found = False
 
     if "right"    in text_lower:                           delta["x"] =  scaled; found = True

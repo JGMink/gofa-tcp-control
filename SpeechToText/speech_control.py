@@ -254,11 +254,13 @@ def parse_movement_command(text: str):
         elif "large" in text_lower or "big" in text_lower or "lot" in text_lower:
             distance = 2.0
 
-    if "millimeter" in text_lower or "mm" in text_lower:
-        distance = distance / 10.0
+    if "centimeter" in text_lower or "cm" in text_lower:
+        distance /= 10.0
+    elif "millimeter" in text_lower or "mm" in text_lower:
+        distance /= 100.0
 
     delta = {"x": 0.0, "y": 0.0, "z": 0.0}
-    scaled_distance = distance * DISTANCE_SCALE
+    scaled_distance = round(distance * DISTANCE_SCALE, 4)
 
     found_direction = False
     if "right" in text_lower:
