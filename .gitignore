@@ -16,9 +16,10 @@ env/
 # ============================================
 # Generated command files (hot-files)
 # ============================================
-tcp_commands.json
-tcp_commands_detailed.json
-asr_luis_log.jsonl
+UnityProject/tcp_ack.json
+UnityProject/tcp_commands.json
+UnityProject/tcp_current_position.json
+
 
 # ============================================
 # Unity
