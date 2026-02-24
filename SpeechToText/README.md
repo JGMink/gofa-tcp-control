@@ -139,7 +139,7 @@ The JSON file is the entire communication layer between Python and Unity. There 
 
 ---
 
-## For Junior Developers — What to Build Next
+## What to Build Next
 
 This repo gives you a working foundation: you can move the robot's TCP anywhere in its workspace with a voice command or a typed command. The natural next step is to make the robot **draw shapes**.
 
@@ -158,8 +158,7 @@ Extend `tcp_commands.json` to support a `motion_type` field and, eventually, a l
   "x": 0.15,
   "y": 0.30,
   "z": -0.10,
-  "motion_type": "linear",
-  "gripper_position": 0.11
+  "motion_type": "linear"
 }
 ```
 
